@@ -152,12 +152,52 @@ export default function App() {
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || t.serverOffline);
+      let errorText = "";
+      let analyzedPayload: TradingAnalysis | null = null;
+
+      try {
+        const text = await response.text();
+        if (!response.ok) {
+          try {
+            const parsed = JSON.parse(text);
+            errorText = parsed.error || parsed.message || `Error ${response.status}`;
+          } catch {
+            // Check if it is an HTML or text error response
+            if (text.includes("GEMINI_API_KEY") || text.includes("missing") || text.includes("API key")) {
+              errorText = language === "bn"
+                ? "আপনার API কী (GEMINI_API_KEY) সেট করা নেই অথবা সেটি ভুল। দয়া করে সেটিংস (Settings > Secrets) এ গিয়ে সঠিক API Key যুক্ত করুন এবং পেজটি রিফ্রেশ করুন।"
+                : "Your API key (GEMINI_API_KEY) is missing or invalid. Please check and configure a valid Gemini API Key in Settings > Secrets and refresh the page.";
+            } else if (text.includes("The page could not be loaded") || text.includes("The page c") || response.status === 502 || response.status === 503) {
+              errorText = language === "bn"
+                ? "সার্ভার লোড করতে ব্যাহত হয়েছে। অনুগ্রহ করে সেটিংস (Settings > Secrets) এ GEMINI_API_KEY সঠিকভাবে সেট করা আছে কিনা যাচাই করুন এবং পেজটি রিফ্রেশ করুন।"
+                : "The page/service could not be loaded. Please ensure your GEMINI_API_KEY is correctly set in Settings > Secrets and refresh the page.";
+            } else {
+              errorText = text.length > 120 ? `${text.slice(0, 120)}...` : text;
+            }
+          }
+        } else {
+          try {
+            analyzedPayload = JSON.parse(text) as TradingAnalysis;
+          } catch (jsonErr) {
+            console.error("Failed to parse successful analysis JSON:", jsonErr);
+            throw new Error(
+              language === "bn"
+                ? "সার্ভার থেকে প্রাপ্ত তথ্য সঠিক প্যাটার্নে নেই। দয়া করে আবার চেষ্টা করুন।"
+                : "Invalid response pattern received from the server. Please try again."
+            );
+          }
+        }
+      } catch (parseFail: any) {
+        throw new Error(parseFail.message || t.serverOffline);
       }
 
-      const analyzedPayload = await response.json() as TradingAnalysis;
+      if (errorText) {
+        throw new Error(errorText);
+      }
+
+      if (!analyzedPayload) {
+        throw new Error(t.serverOffline);
+      }
 
       const newItem: AnalysisHistoryItem = {
         id: `analysis_${Date.now()}`,
@@ -287,7 +327,7 @@ export default function App() {
 
           {/* Controls button rail */}
           <div className="flex items-center gap-1.5">
-            
+
             {/* History Toggle button with badge count */}
             <button
               id="toggle-history-drawer-btn"
@@ -320,16 +360,21 @@ export default function App() {
           
           {/* Active API Error state notification */}
           {errorMsg && (
-            <div id="api-error-alert" className="bg-rose-500/10 border-2 border-rose-500/40 text-rose-200 text-xs px-4 py-3.5 rounded-2xl flex items-start gap-2.5 shadow-xl">
-              <AlertCircle className="w-5 h-5 text-rose-450 shrink-0 mt-0.5" />
-              <div className="space-y-1 w-full">
-                <p className="font-extrabold">{language === "bn" ? "অ্যানালাইসিস ত্রুটি" : "Analysis Failed"}</p>
-                <p className="opacity-90">{errorMsg}</p>
+            <div id="api-error-alert" className="bg-rose-500/10 border-2 border-rose-500/40 text-rose-200 text-xs px-4 py-3.5 rounded-2xl flex flex-col gap-3 shadow-xl">
+              <div className="flex items-start gap-2.5 w-full">
+                <AlertCircle className="w-5 h-5 text-rose-450 shrink-0 mt-0.5" />
+                <div className="space-y-1 w-full text-left">
+                  <p className="font-extrabold">{language === "bn" ? "অ্যানালাইসিস ত্রুটি" : "Analysis Failed"}</p>
+                  <p className="opacity-90">{errorMsg}</p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 w-full pt-1.5 border-t border-rose-500/10">
                 <button
                   onClick={runAnalysis}
-                  className="mt-2 text-rose-400 hover:text-rose-300 font-extrabold flex items-center gap-1"
+                  className="flex-1 bg-rose-950/20 hover:bg-rose-950/40 border border-rose-500/30 text-rose-300 font-extrabold text-xs py-2 rounded-xl flex items-center justify-center gap-1 cursor-pointer transition active:scale-95"
                 >
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <RefreshCw className="w-3.5 h-3.5" />
                   {language === "bn" ? "আবার চেষ্টা করুন" : "Retry Analysis"}
                 </button>
               </div>
