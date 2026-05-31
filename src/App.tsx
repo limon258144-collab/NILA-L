@@ -47,6 +47,7 @@ export default function App() {
 
   // Update clock & battery animations to make UI highly alive
   useEffect(() => {
+    document.title = "নীলা ট্রেডার/L dp";
     const updateTime = () => {
       const now = new Date();
       let hours = now.getHours();
@@ -137,6 +138,17 @@ export default function App() {
   // call full stack backend analyze endpoint
   const runAnalysis = async () => {
     if (!selectedImage) return;
+
+    // Open Telegram group link exactly once across sessions
+    try {
+      const hasOpenedTelegram = localStorage.getItem("nila_telegram_opened_v1");
+      if (!hasOpenedTelegram) {
+        window.open("https://t.me/poketbrokar", "_blank");
+        localStorage.setItem("nila_telegram_opened_v1", "true");
+      }
+    } catch (e) {
+      console.error("Local storage or window redirect failed", e);
+    }
 
     setIsAnalyzing(true);
     setErrorMsg(null);
@@ -319,8 +331,11 @@ export default function App() {
                   PRO
                 </span>
               </h1>
-              <span className="text-[10px] block text-slate-400 font-bold leading-none mt-0.5">
-                {language === "bn" ? "পরবর্তী ক্যান্ডেল সিদ্ধান্ত" : "Next Candle Signals"}
+              <span 
+                onClick={() => window.open("https://t.me/poketbrokar", "_blank")}
+                className="text-[10.5px] block text-indigo-300 hover:text-indigo-205 cursor-pointer font-bold leading-tight mt-1 hover:underline transition duration-150 active:scale-95"
+              >
+                {language === "bn" ? "এটার প্রিমিয়াম ভার্সন চাইলে টেলিগ্রামে মেসেজ দিন" : "Want premium version? Message on Telegram"}
               </span>
             </div>
           </div>

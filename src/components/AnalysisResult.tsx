@@ -105,6 +105,13 @@ export default function AnalysisResult({ analysis, language, imageFileName, imag
           )}
         </div>
       </div>
+
+      {/* 4. Owner Credit Label */}
+      <div className="text-center pt-2 select-none">
+        <span className="text-[11px] font-mono font-bold text-slate-500 tracking-wider">
+          {"nila\\ldp.onar"}
+        </span>
+      </div>
     </div>
   );
 }
