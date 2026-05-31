@@ -1,0 +1,6 @@
+{
+  "name": "Trading AI Chart Analyzer",
+  "description": "An AI-powered candlestick chart pattern analyzer that predicts the next candle's direction and provides precise buy and sell target entry thresholds in both Bengali and English.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
