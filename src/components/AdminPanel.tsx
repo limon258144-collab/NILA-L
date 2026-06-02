@@ -33,6 +33,8 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
   const [newPassword, setNewPassword] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [adminAlertMsg, setAdminAlertMsg] = useState<string | null>(null);
 
   // App variables/settings form state
   const [adminTelegram, setAdminTelegram] = useState("https://t.me/poketbrokar");
@@ -157,20 +159,10 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
   // Handle Delete User
   const handleDeleteUser = (usernameToDelete: string) => {
     if (usernameToDelete === "admin" || usernameToDelete === "00000000000") {
-      alert(language === "bn" ? "প্রধান এডমিন অ্যাকাউন্ট ডিলিট করা সম্ভব নয়!" : "Main admin cannot be deleted!");
+      setAdminAlertMsg(language === "bn" ? "প্রধান এডমিন অ্যাকাউন্ট ডিলিট করা সম্ভব নয়!" : "Main admin cannot be deleted!");
       return;
     }
-
-    const msg = language === "bn" 
-      ? `আপনি কি '${usernameToDelete}' ইউজারটি মুছে ফেলতে চান?` 
-      : `Are you sure you want to delete user '${usernameToDelete}'?`;
-
-    if (confirm(msg)) {
-      const updated = { ...users };
-      delete updated[usernameToDelete];
-      localStorage.setItem("nila_registered_users_v1", JSON.stringify(updated));
-      setUsers(updated);
-    }
+    setUserToDelete(usernameToDelete);
   };
 
   // Filter list of users
@@ -463,6 +455,73 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
           )}
         </div>
       </div>
+
+      {/* Custom Confirmation Modal */}
+      {userToDelete && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-[#111116] border-2 border-indigo-500/30 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl text-center">
+            <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/20">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-white font-extrabold text-sm uppercase">
+                {language === "bn" ? "ইউজার মুছে ফেলতে চান?" : "Delete User Account?"}
+              </h4>
+              <p className="text-slate-400 text-xs leading-relaxed font-semibold">
+                {language === "bn"
+                  ? `আপনি কি সত্যিই '${userToDelete}' ট্রেডার অ্যাকাউন্টটি মুছে ফেলতে চান?`
+                  : `Are you sure you want to completely delete '${userToDelete}'?`}
+              </p>
+            </div>
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setUserToDelete(null)}
+                className="flex-1 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-350 text-xs font-bold py-2.5 rounded-xl transition duration-150 active:scale-95 cursor-pointer"
+              >
+                {language === "bn" ? "বাতিল করুন" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const updated = { ...users };
+                  delete updated[userToDelete];
+                  localStorage.setItem("nila_registered_users_v1", JSON.stringify(updated));
+                  setUsers(updated);
+                  setUserToDelete(null);
+                  window.dispatchEvent(new Event("nila_settings_updated"));
+                }}
+                className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold py-2.5 rounded-xl transition duration-150 active:scale-95 cursor-pointer"
+              >
+                {language === "bn" ? "মুছে ফেলুন" : "Confirm Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Alert Modal */}
+      {adminAlertMsg && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-[#111116] border-2 border-indigo-500/30 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl text-center">
+            <div className="w-12 h-12 rounded-full bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto border border-indigo-500/20">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-slate-200 text-xs leading-relaxed font-semibold">
+                {adminAlertMsg}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAdminAlertMsg(null)}
+              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black py-2.5 rounded-xl transition duration-150 active:scale-95 cursor-pointer"
+            >
+              {language === "bn" ? "ঠিক আছে" : "OK"}
+            </button>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

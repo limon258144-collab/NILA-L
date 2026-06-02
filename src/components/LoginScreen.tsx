@@ -345,27 +345,7 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
           </button>
         </div>
 
-        {/* Demo Fallback hints for ease of use */}
-        <div className="mt-4 bg-slate-950/80 border border-slate-800/40 rounded-xl p-2.5 text-center text-[10.5px]">
-          <span className="text-emerald-450 font-bold block mb-1">
-            🔑 {language === "bn" ? "নিবন্ধিত অ্যাকাউন্ট দিয়ে লগইন করুন:" : "Registered Accounts:"}
-          </span>
-          <p className="text-slate-400 leading-relaxed">
-            {language === "bn" 
-              ? "সাধারণ ইউজারনেম admin এবং পাসওয়ার্ড 123 দিয়ে লগইন করুন, অথবা সম্পূর্ণ নতুন অ্যাকাউন্ট খুলুন।" 
-              : "Use 'admin' as username and '123' as password to test, or click Register above to create your own!"}
-          </p>
-          <div className="mt-2 pt-2 border-t border-slate-800/60">
-            <span className="text-indigo-400 font-bold block mb-0.5">
-              🛡️ {language === "bn" ? "এডমিন প্যানেলে লগইন করার নিয়ম:" : "Admin Panel Access:"}
-            </span>
-            <p className="text-slate-300 font-mono text-[9px] font-semibold">
-              Username: <span className="text-white bg-slate-900 border border-slate-800 px-1 py-0.2 rounded font-black">00000000000</span>
-              <br />
-              Password: <span className="text-white bg-slate-900 border border-slate-800 px-1 py-0.2 rounded font-black">0000000000</span>
-            </p>
-          </div>
-        </div>
+
 
       </div>
     </motion.div>
