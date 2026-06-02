@@ -19,6 +19,28 @@ export default function AnalysisResult({ analysis, language, imageFileName, imag
   const isUp = analysis.prediction?.toLowerCase() === "up";
   const isDown = analysis.prediction?.toLowerCase() === "down";
 
+  const [telegram, setTelegram] = React.useState("https://t.me/poketbrokar");
+  const [owner1, setOwner1] = React.useState("nila\\ldp.onar");
+  const [owner2, setOwner2] = React.useState("korim debolopar");
+
+  React.useEffect(() => {
+    const loadCustomVals = () => {
+      const storedTelegram = localStorage.getItem("nila_custom_telegram_v1");
+      if (storedTelegram) setTelegram(storedTelegram);
+
+      const storedOwner1 = localStorage.getItem("nila_custom_owner1_v1");
+      if (storedOwner1) setOwner1(storedOwner1);
+
+      const storedOwner2 = localStorage.getItem("nila_custom_owner2_v1");
+      if (storedOwner2) setOwner2(storedOwner2);
+    };
+
+    loadCustomVals();
+
+    window.addEventListener("nila_settings_updated", loadCustomVals);
+    return () => window.removeEventListener("nila_settings_updated", loadCustomVals);
+  }, []);
+
   // Vibrant compact styling
   let predictionBg = "bg-[#111114] border-slate-800";
   let predictionText = "text-yellow-400 drop-shadow-[0_0_15px_rgba(234,179,8,0.3)]";
@@ -107,10 +129,31 @@ export default function AnalysisResult({ analysis, language, imageFileName, imag
       </div>
 
       {/* 4. Owner Credit Label */}
-      <div className="text-center pt-2 select-none">
-        <span className="text-[11px] font-mono font-bold text-slate-500 tracking-wider">
-          {"nila\\ldp.onar"}
-        </span>
+      <div className="border-t border-slate-800/30 pt-2.5 mt-2 text-center select-none">
+        <p className="text-[11px] text-slate-400/90 font-medium mb-1.5 tracking-wide">
+          যেকোনো প্রয়োজনে এখানে ট্যাপ করে মেসেজ দিন
+        </p>
+        <div className="flex items-center justify-between px-1 text-[10.5px] font-mono font-bold tracking-wider">
+          <div 
+            onClick={() => window.open(telegram, "_blank")}
+            className="tg-interactive-glow flex items-center gap-1.5 cursor-pointer transition-colors duration-150 active:scale-95 hover:underline decoration-sky-400/50"
+          >
+            <svg className="w-3.5 h-3.5 fill-current shrink-0 text-sky-400" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.62 5.8c.15-.1.32-.17.49-.17.18 0 .35.05.49.14.15.1.25.26.28.45.03.18.01.38-.06.56l-2.11 9.55c-.09.4-.33.74-.68.96-.34.22-.76.28-1.15.17l-3-2.12-1.63 1.58c-.12.12-.29.19-.46.19-.13 0-.25-.03-.36-.1-.18-.1-.31-.27-.36-.48l-1.09-3.54-3.12-.98c-.41-.13-.73-.44-.86-.84-.13-.4-.05-.84.22-1.17l12.44-7.56z"/>
+            </svg>
+            <span>{owner1}</span>
+          </div>
+          
+          <div 
+            onClick={() => window.open(telegram, "_blank")}
+            className="tg-interactive-glow flex items-center gap-1.5 cursor-pointer transition-colors duration-150 active:scale-95 hover:underline decoration-sky-400/50"
+          >
+            <svg className="w-3.5 h-3.5 fill-current shrink-0 text-sky-400" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm3.62 5.8c.15-.1.32-.17.49-.17.18 0 .35.05.49.14.15.1.25.26.28.45.03.18.01.38-.06.56l-2.11 9.55c-.09.4-.33.74-.68.96-.34.22-.76.28-1.15.17l-3-2.12-1.63 1.58c-.12.12-.29.19-.46.19-.13 0-.25-.03-.36-.1-.18-.1-.31-.27-.36-.48l-1.09-3.54-3.12-.98c-.41-.13-.73-.44-.86-.84-.13-.4-.05-.84.22-1.17l12.44-7.56z"/>
+            </svg>
+            <span>{owner2}</span>
+          </div>
+        </div>
       </div>
     </div>
   );

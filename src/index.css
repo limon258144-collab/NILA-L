@@ -50,3 +50,22 @@
 .neon-glow-down {
   box-shadow: 0 0 20px rgba(244, 63, 94, 0.35);
 }
+
+/* Gentle floating & glowing animation for Telegram buttons/links */
+@keyframes telegram-float-glow {
+  0%, 100% {
+    transform: translateY(0);
+    filter: drop-shadow(0 0 2px rgba(56, 189, 248, 0.4));
+    color: #38bdf8;
+  }
+  50% {
+    transform: translateY(-2.5px);
+    filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.85));
+    color: #e0f2fe;
+  }
+}
+
+.tg-interactive-glow {
+  animation: telegram-float-glow 2.5s infinite ease-in-out;
+}
+

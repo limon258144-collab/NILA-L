@@ -78,9 +78,9 @@ app.post("/api/analyze", async (req, res): Promise<any> => {
       Provide your analysis strictly in valid JSON matching the requested response schema format. Do not prepend markdown formatting inside the json fields. Treat this as an educational and statistical pattern match tool.
     `;
 
-    // Make the Gemini API call safely using gemini-3.5-flash
+    // Make the Gemini API call safely using gemini-2.5-flash for much faster analysis and fewer rate limits
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: [
         {
           inlineData: {

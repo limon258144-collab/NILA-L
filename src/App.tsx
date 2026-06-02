@@ -15,17 +15,48 @@ import {
   History,
   X,
   Smartphone,
-  Sparkles
+  Sparkles,
+  LogOut,
+  ShieldCheck,
+  Megaphone
 } from "lucide-react";
 import { AnalysisHistoryItem, TradingAnalysis } from "./types";
 import { translations, Language } from "./utils/translations";
 import UploadArea from "./components/UploadArea";
 import AnalysisResult from "./components/AnalysisResult";
+import LoginScreen from "./components/LoginScreen";
+import AdminPanel from "./components/AdminPanel";
 
 export default function App() {
   // Translate & Language States
   const [language, setLanguage] = useState<Language>("bn"); // Default to Bangla as requested in Bengali
   const t = translations[language];
+
+  // User Authentication State
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+
+  // App configurations controlled dynamically by the admin
+  const [telegramLink, setTelegramLink] = useState("https://t.me/poketbrokar");
+  const [globalAnnouncement, setGlobalAnnouncement] = useState("");
+
+  const refreshCustomConfig = () => {
+    try {
+      const storedTelegram = localStorage.getItem("nila_custom_telegram_v1");
+      if (storedTelegram) setTelegramLink(storedTelegram);
+
+      const storedAnnounce = localStorage.getItem("nila_custom_announcement_v1");
+      if (storedAnnounce) setGlobalAnnouncement(storedAnnounce);
+    } catch (e) {
+      console.error("Failed to load configs from storage", e);
+    }
+  };
+
+  useEffect(() => {
+    refreshCustomConfig();
+    window.addEventListener("nila_settings_updated", refreshCustomConfig);
+    return () => window.removeEventListener("nila_settings_updated", refreshCustomConfig);
+  }, []);
 
   // Core Data States
   const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
@@ -67,9 +98,30 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Load history from localStorage on mount
+  // Load history and user session from localStorage on mount
   useEffect(() => {
     try {
+      const storedUser = localStorage.getItem("nila_logged_in_user_v1");
+      if (storedUser) {
+        setCurrentUser(storedUser);
+        if (storedUser === "00000000000") {
+          setShowAdminPanel(true);
+        }
+        // Register active session in localStorage
+        try {
+          const storedSessions = localStorage.getItem("nila_active_sessions_v1");
+          let sessions: Record<string, number> = {};
+          if (storedSessions) {
+            sessions = JSON.parse(storedSessions);
+          }
+          sessions[storedUser] = Date.now();
+          localStorage.setItem("nila_active_sessions_v1", JSON.stringify(sessions));
+          window.dispatchEvent(new Event("nila_settings_updated"));
+        } catch (err) {
+          console.error("Failed to register session on mount", err);
+        }
+      }
+
       const storedHistory = localStorage.getItem("trading_analysis_history_v1");
       if (storedHistory) {
         const parsed = JSON.parse(storedHistory) as AnalysisHistoryItem[];
@@ -80,7 +132,7 @@ export default function App() {
         }
       }
     } catch (e) {
-      console.error("Failed to parse localStorage history", e);
+      console.error("Failed to parse localStorage history or user session on load", e);
     }
   }, []);
 
@@ -143,7 +195,7 @@ export default function App() {
     try {
       const hasOpenedTelegram = localStorage.getItem("nila_telegram_opened_v1");
       if (!hasOpenedTelegram) {
-        window.open("https://t.me/poketbrokar", "_blank");
+        window.open(telegramLink, "_blank");
         localStorage.setItem("nila_telegram_opened_v1", "true");
       }
     } catch (e) {
@@ -332,7 +384,7 @@ export default function App() {
                 </span>
               </h1>
               <span 
-                onClick={() => window.open("https://t.me/poketbrokar", "_blank")}
+                onClick={() => window.open(telegramLink, "_blank")}
                 className="text-[10.5px] block text-indigo-300 hover:text-indigo-205 cursor-pointer font-bold leading-tight mt-1 hover:underline transition duration-150 active:scale-95"
               >
                 {language === "bn" ? "এটার প্রিমিয়াম ভার্সন চাইলে টেলিগ্রামে মেসেজ দিন" : "Want premium version? Message on Telegram"}
@@ -344,18 +396,20 @@ export default function App() {
           <div className="flex items-center gap-1.5">
 
             {/* History Toggle button with badge count */}
-            <button
-              id="toggle-history-drawer-btn"
-              onClick={() => setShowHistoryDrawer(!showHistoryDrawer)}
-              className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition active:scale-90 relative cursor-pointer"
-            >
-              <History className="w-4 h-4" />
-              {history.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-indigo-600 text-[8px] font-extrabold text-white rounded-full flex items-center justify-center animate-bounce">
-                  {history.length}
-                </span>
-              )}
-            </button>
+            {currentUser && (
+              <button
+                id="toggle-history-drawer-btn"
+                onClick={() => setShowHistoryDrawer(!showHistoryDrawer)}
+                className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition active:scale-90 relative cursor-pointer"
+              >
+                <History className="w-4 h-4" />
+                {history.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-indigo-600 text-[8px] font-extrabold text-white rounded-full flex items-center justify-center animate-bounce">
+                    {history.length}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* Language switch button */}
             <button
@@ -367,161 +421,242 @@ export default function App() {
               {language === "bn" ? "EN" : "বাংলা"}
             </button>
 
+            {/* Admin control toggle button */}
+            {currentUser === "00000000000" && (
+              <button
+                id="admin-toggle-btn"
+                onClick={() => setShowAdminPanel(!showAdminPanel)}
+                className={`p-2 rounded-xl border transition duration-150 active:scale-90 cursor-pointer ${
+                  showAdminPanel 
+                    ? "bg-indigo-650 border-indigo-550 text-white shadow-md shadow-indigo-600/20" 
+                    : "bg-slate-900 border-slate-805 text-indigo-400 hover:text-indigo-300"
+                }`}
+                title={language === "bn" ? "এডমিন প্যানেল" : "Admin Panel"}
+              >
+                <ShieldCheck className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Log out button when logged-in */}
+            {currentUser && (
+              <button
+                id="logout-btn"
+                onClick={() => {
+                  if (confirm(language === "bn" ? "আপনি কি লগ আউট করতে চান?" : "Are you sure you want to log out?")) {
+                    const userToRemove = currentUser;
+                    setCurrentUser(null);
+                    localStorage.removeItem("nila_logged_in_user_v1");
+                    setShowAdminPanel(false);
+                    try {
+                      const storedSessions = localStorage.getItem("nila_active_sessions_v1");
+                      if (storedSessions && userToRemove) {
+                        const sessions = JSON.parse(storedSessions);
+                        delete sessions[userToRemove];
+                        localStorage.setItem("nila_active_sessions_v1", JSON.stringify(sessions));
+                        window.dispatchEvent(new Event("nila_settings_updated"));
+                      }
+                    } catch (err) {
+                      console.error(err);
+                    }
+                  }
+                }}
+                className="p-2 rounded-xl bg-rose-950/20 border border-rose-500/25 text-rose-400 hover:text-white hover:bg-rose-900/10 transition active:scale-90 cursor-pointer"
+                title={language === "bn" ? "লগ আউট" : "Log Out"}
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
+
           </div>
         </header>
 
         {/* Mock App Inner Canvas Scroll container - Touch scroll mimicking real phone feel */}
         <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#07070a] p-4 space-y-6 pb-24 relative z-30">
           
-          {/* Active API Error state notification */}
-          {errorMsg && (
-            <div id="api-error-alert" className="bg-rose-500/10 border-2 border-rose-500/40 text-rose-200 text-xs px-4 py-3.5 rounded-2xl flex flex-col gap-3 shadow-xl">
-              <div className="flex items-start gap-2.5 w-full">
-                <AlertCircle className="w-5 h-5 text-rose-450 shrink-0 mt-0.5" />
-                <div className="space-y-1 w-full text-left">
-                  <p className="font-extrabold">{language === "bn" ? "অ্যানালাইসিস ত্রুটি" : "Analysis Failed"}</p>
-                  <p className="opacity-90">{errorMsg}</p>
-                </div>
-              </div>
-
-              <div className="flex gap-2 w-full pt-1.5 border-t border-rose-500/10">
-                <button
-                  onClick={runAnalysis}
-                  className="flex-1 bg-rose-950/20 hover:bg-rose-950/40 border border-rose-500/30 text-rose-300 font-extrabold text-xs py-2 rounded-xl flex items-center justify-center gap-1 cursor-pointer transition active:scale-95"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  {language === "bn" ? "আবার চেষ্টা করুন" : "Retry Analysis"}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Core App View Controller */}
-          {isAnalyzing ? (
-            /* Analysis loading display */
-            <div id="analysis-loading-state" className="bg-[#111116] border-2 border-slate-800 rounded-3xl p-8 text-center min-h-[360px] flex flex-col items-center justify-center space-y-5 animate-fade-in relative overflow-hidden">
-              <div className="absolute inset-x-0 top-0 h-1 bg-slate-800">
-                <div className="h-full bg-indigo-500 animate-[pulse_1.5s_infinite]" style={{ width: "70%" }} />
-              </div>
-              <div className="relative">
-                <div className="w-14 h-14 rounded-full border-4 border-slate-850 border-t-indigo-500 animate-spin" />
-                <TrendingUp className="w-5 h-5 text-indigo-400 absolute inset-0 m-auto loading-pulse animate-bounce" />
-              </div>
-              <div className="space-y-2 max-w-sm">
-                <h3 className="text-white font-display font-black text-base md:text-lg">
-                  {t.analyzing}
-                </h3>
-                <p className="text-[#a855f7] text-xs font-mono font-bold tracking-tight h-10 content-center">
-                  {steps[analysisStep]}
-                </p>
-              </div>
-              
-              <div className="w-48 bg-slate-900 border border-slate-800 h-2 rounded-full overflow-hidden">
-                <div 
-                  className="bg-indigo-500 h-full transition-all duration-700 ease-out" 
-                  style={{ width: `${((analysisStep + 1) / steps.length) * 100}%` }}
-                />
-              </div>
-            </div>
-          ) : selectedImage ? (
-            /* image loaded - prep for analysis view */
-            <div id="analysis-ready-view" className="bg-[#111116] border-2 border-indigo-500/20 rounded-3xl p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <h3 className="text-white font-display font-black text-xs flex items-center gap-2">
-                  <FileCheck className="w-4 h-4 text-indigo-400" />
-                  নতুন চার্ট স্ক্যান করতে প্রস্তুত
-                </h3>
-                <span className="text-[10px] text-indigo-400 font-mono truncate max-w-[140px]">
-                  {selectedFileName}
-                </span>
-              </div>
-
-              <div className="bg-slate-950 rounded-2xl overflow-hidden aspect-[4/3] p-3 flex items-center justify-center border border-slate-850">
-                <img
-                  src={selectedImage}
-                  alt="Tentative chart selection"
-                  className="max-h-full max-w-full object-contain"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-
-              <div className="flex flex-col gap-2 pt-2">
-                <button
-                  id="trigger-analysis-btn"
-                  onClick={runAnalysis}
-                  className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 px-4 rounded-2xl shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 transition duration-150 active:scale-95 cursor-pointer"
-                >
-                  <Search className="w-5 h-5 animate-pulse" />
-                  বিশ্লেষণ শুরু করুন
-                </button>
-                <button
-                  id="cancel-image-selection-btn"
-                  onClick={handleCancelSelection}
-                  className="w-full py-3 border-2 border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs rounded-2xl hover:bg-slate-900 transition flex items-center justify-center gap-1 cursor-pointer"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  বাতিল করুন
-                </button>
-              </div>
-            </div>
-          ) : activeItem ? (
-            /* Active Analysis decision screens */
-            <div className="space-y-5 animate-fade-in">
-              
-              {/* Quick swap uploader link banner */}
-              <div className="flex items-center justify-between gap-3 bg-[#111116] border-2 border-slate-800 rounded-3xl px-4 py-3">
-                <div className="max-w-[200px] overflow-hidden">
-                  <span className="text-[9px] uppercase font-mono text-indigo-400 font-black block tracking-widest">ফাইল রেকর্ড</span>
-                  <span className="text-xs text-white truncate block font-bold leading-tight mt-0.5">{activeItem.imageFileName}</span>
-                </div>
-                <button
-                  id="nav-to-uploader-btn"
-                  onClick={() => {
-                    setSelectedImage(null);
-                    setSelectedFileName(null);
-                    setActiveItem(null);
-                  }}
-                  className="bg-indigo-600/10 border-2 border-indigo-500/30 text-indigo-300 font-black text-xs px-3.5 py-2 rounded-2xl hover:bg-[#131520] transition duration-150 flex items-center gap-1 cursor-pointer active:scale-95"
-                >
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: "6s" }} />
-                  নতুন চার্ট দিন
-                </button>
-              </div>
-
-
-
-              {/* Comprehensive visual pattern metrics */}
-              <AnalysisResult
-                analysis={activeItem.analysis}
-                language={language}
-                imageFileName={activeItem.imageFileName}
-                imageDataUrl={activeItem.imageDataUrl}
-              />
-
-            </div>
+          {!currentUser ? (
+            <LoginScreen 
+              language={language === "bn" ? "bn" : "en"} 
+              onLoginSuccess={(un) => {
+                setCurrentUser(un);
+                localStorage.setItem("nila_logged_in_user_v1", un);
+                if (un === "00000000000") {
+                  setShowAdminPanel(true);
+                }
+                try {
+                  const storedSessions = localStorage.getItem("nila_active_sessions_v1");
+                  let sessions: Record<string, number> = {};
+                  if (storedSessions) {
+                    sessions = JSON.parse(storedSessions);
+                  }
+                  sessions[un] = Date.now();
+                  localStorage.setItem("nila_active_sessions_v1", JSON.stringify(sessions));
+                  window.dispatchEvent(new Event("nila_settings_updated"));
+                } catch (err) {
+                  console.error(err);
+                }
+              }} 
+            />
+          ) : showAdminPanel ? (
+            <AdminPanel 
+              language={language} 
+              onBackToApp={() => setShowAdminPanel(false)} 
+            />
           ) : (
-            /* Standard Uploader dashboard */
-            <div className="space-y-5 animate-fade-in">
-              
-              <div className="bg-[#111116] border-2 border-indigo-500/20 rounded-3xl p-5 text-center relative overflow-hidden">
-                <div className="absolute -right-12 -top-12 w-28 h-28 bg-[#c084fc]/10 rounded-full blur-2xl pointer-events-none" />
-                <h3 className="text-white font-display font-black text-base mb-1">
-                  কোনো ট্রেডিং চার্ট ফাইল নেই
-                </h3>
-                <p className="text-xs text-slate-400 leading-relaxed font-semibold">
-                  আপনার কিউএল, পকেট অপশন বা ট্রেডিংভিউ চার্টের স্ক্রিনশট নিচে আপলোড করুন। আমাদের এআই অ্যানালাইজার তৎক্ষণাৎ পরবর্তী ক্যান্ডেলের পূর্বাভাস নির্ধারণ করে দেবে।
-                </p>
-              </div>
+            <>
+              {/* Global Broadcast Announcement set by Admin */}
+              {globalAnnouncement && (
+                <div className="bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-indigo-950/40 border-2 border-indigo-500/15 rounded-2xl p-2.5 px-3.5 flex items-center gap-2.5 text-left text-xs text-indigo-200 animate-fade-in">
+                  <Megaphone className="w-3.5 h-3.5 text-indigo-400 shrink-0" style={{ animationDuration: "2s" }} />
+                  <p className="font-semibold leading-relaxed select-none">{globalAnnouncement}</p>
+                </div>
+              )}
+              {/* Active API Error state notification */}
+              {errorMsg && (
+                <div id="api-error-alert" className="bg-rose-500/10 border-2 border-rose-500/40 text-rose-200 text-xs px-4 py-3.5 rounded-2xl flex flex-col gap-3 shadow-xl">
+                  <div className="flex items-start gap-2.5 w-full">
+                    <AlertCircle className="w-5 h-5 text-rose-450 shrink-0 mt-0.5" />
+                    <div className="space-y-1 w-full text-left">
+                      <p className="font-extrabold">{language === "bn" ? "অ্যানালাইসিস ত্রুটি" : "Analysis Failed"}</p>
+                      <p className="opacity-90">{errorMsg}</p>
+                    </div>
+                  </div>
 
-              <UploadArea
-                onImageSelected={handleImageSelected}
-                language={language}
-                isAnalyzing={isAnalyzing}
-              />
+                  <div className="flex gap-2 w-full pt-1.5 border-t border-rose-500/10">
+                    <button
+                      onClick={runAnalysis}
+                      className="flex-1 bg-rose-950/20 hover:bg-rose-950/40 border border-rose-500/30 text-rose-300 font-extrabold text-xs py-2 rounded-xl flex items-center justify-center gap-1 cursor-pointer transition active:scale-95"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      {language === "bn" ? "আবার চেষ্টা করুন" : "Retry Analysis"}
+                    </button>
+                  </div>
+                </div>
+              )}
 
+              {/* Core App View Controller */}
+              {isAnalyzing ? (
+                /* Analysis loading display */
+                <div id="analysis-loading-state" className="bg-[#111116] border-2 border-slate-800 rounded-3xl p-8 text-center min-h-[360px] flex flex-col items-center justify-center space-y-5 animate-fade-in relative overflow-hidden">
+                  <div className="absolute inset-x-0 top-0 h-1 bg-slate-800">
+                    <div className="h-full bg-indigo-500 animate-[pulse_1.5s_infinite]" style={{ width: "70%" }} />
+                  </div>
+                  <div className="relative">
+                    <div className="w-14 h-14 rounded-full border-4 border-slate-850 border-t-indigo-500 animate-spin" />
+                    <TrendingUp className="w-5 h-5 text-indigo-400 absolute inset-0 m-auto loading-pulse animate-bounce" />
+                  </div>
+                  <div className="space-y-2 max-w-sm">
+                    <h3 className="text-white font-display font-black text-base md:text-lg">
+                      {t.analyzing}
+                    </h3>
+                    <p className="text-[#a855f7] text-xs font-mono font-bold tracking-tight h-10 content-center">
+                      {steps[analysisStep]}
+                    </p>
+                  </div>
+                  
+                  <div className="w-48 bg-slate-900 border border-slate-800 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-indigo-500 h-full transition-all duration-700 ease-out" 
+                      style={{ width: `${((analysisStep + 1) / steps.length) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ) : selectedImage ? (
+                /* image loaded - prep for analysis view */
+                <div id="analysis-ready-view" className="bg-[#111116] border-2 border-indigo-500/20 rounded-3xl p-5 space-y-4">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h3 className="text-white font-display font-black text-xs flex items-center gap-2">
+                      <FileCheck className="w-4 h-4 text-indigo-400" />
+                      নতুন চার্ট স্ক্যান করতে প্রস্তুত
+                    </h3>
+                    <span className="text-[10px] text-indigo-400 font-mono truncate max-w-[140px]">
+                      {selectedFileName}
+                    </span>
+                  </div>
 
+                  <div className="bg-slate-950 rounded-2xl overflow-hidden aspect-[4/3] p-3 flex items-center justify-center border border-slate-850">
+                    <img
+                      src={selectedImage}
+                      alt="Tentative chart selection"
+                      className="max-h-full max-w-full object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
 
-            </div>
+                  <div className="flex flex-col gap-2 pt-2">
+                    <button
+                      id="trigger-analysis-btn"
+                      onClick={runAnalysis}
+                      className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 px-4 rounded-2xl shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 transition duration-150 active:scale-95 cursor-pointer"
+                    >
+                      <Search className="w-5 h-5 animate-pulse" />
+                      বিশ্লেষণ শুরু করুন
+                    </button>
+                    <button
+                      id="cancel-image-selection-btn"
+                      onClick={handleCancelSelection}
+                      className="w-full py-3 border-2 border-slate-800 hover:border-slate-700 text-slate-300 font-bold text-xs rounded-2xl hover:bg-slate-900 transition flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      বাতিল করুন
+                    </button>
+                  </div>
+                </div>
+              ) : activeItem ? (
+                /* Active Analysis decision screens */
+                <div className="space-y-5 animate-fade-in">
+                  
+                  {/* Quick swap uploader link banner */}
+                  <div className="flex items-center justify-between gap-3 bg-[#111116] border-2 border-slate-800 rounded-3xl px-4 py-3">
+                    <div className="max-w-[200px] overflow-hidden">
+                      <span className="text-[9px] uppercase font-mono text-indigo-400 font-black block tracking-widest">ফাইল রেকর্ড</span>
+                      <span className="text-xs text-white truncate block font-bold leading-tight mt-0.5">{activeItem.imageFileName}</span>
+                    </div>
+                    <button
+                      id="nav-to-uploader-btn"
+                      onClick={() => {
+                        setSelectedImage(null);
+                        setSelectedFileName(null);
+                        setActiveItem(null);
+                      }}
+                      className="bg-indigo-600/10 border-2 border-indigo-500/30 text-indigo-300 font-black text-xs px-3.5 py-2 rounded-2xl hover:bg-[#131520] transition duration-150 flex items-center gap-1 cursor-pointer active:scale-95"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: "6s" }} />
+                      নতুন চার্ট দিন
+                    </button>
+                  </div>
+
+                  {/* Comprehensive visual pattern metrics */}
+                  <AnalysisResult
+                    analysis={activeItem.analysis}
+                    language={language}
+                    imageFileName={activeItem.imageFileName}
+                    imageDataUrl={activeItem.imageDataUrl}
+                  />
+
+                </div>
+              ) : (
+                /* Standard Uploader dashboard */
+                <div className="space-y-5 animate-fade-in">
+                  
+                  <div className="bg-[#111116] border-2 border-indigo-500/20 rounded-3xl p-5 text-center relative overflow-hidden">
+                    <div className="absolute -right-12 -top-12 w-28 h-28 bg-[#c084fc]/10 rounded-full blur-2xl pointer-events-none" />
+                    <h3 className="text-white font-display font-black text-base mb-1">
+                      কোনো ট্রেডিং চার্ট ফাইল নেই
+                    </h3>
+                    <p className="text-xs text-slate-400 leading-relaxed font-semibold">
+                      আপনার কিউএল, পকেট অপশন বা ট্রেডিংভিউ চার্টের স্ক্রিনশট নিচে আপলোড করুন। আমাদের এআই অ্যানালাইজার তৎক্ষণাৎ পরবর্তী ক্যান্ডেলের পূর্বাভাস নির্ধারণ করে দেবে।
+                    </p>
+                  </div>
+
+                  <UploadArea
+                    onImageSelected={handleImageSelected}
+                    language={language}
+                    isAnalyzing={isAnalyzing}
+                  />
+
+                </div>
+              )}
+            </>
           )}
 
         </div>
