@@ -173,8 +173,22 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error("Analysis API Error:", error);
+    let errorMessage = (error && error.message) || "An unexpected error occurred during analysis.";
+    
+    // Check if error is due to rate limits or quotas
+    const lowerMessage = errorMessage.toLowerCase();
+    if (
+      lowerMessage.includes("429") || 
+      lowerMessage.includes("quota") || 
+      lowerMessage.includes("limit") || 
+      lowerMessage.includes("exhausted") ||
+      lowerMessage.includes("resource_exhausted")
+    ) {
+      errorMessage = "Gemini API Quota or Rate Limit exceeded. Please try again in 30 seconds.";
+    }
+
     return res.status(500).json({
-      error: error.message || "An unexpected error occurred during analysis.",
+      error: errorMessage,
     });
   }
 }

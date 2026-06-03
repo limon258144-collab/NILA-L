@@ -40,6 +40,7 @@ export default function App() {
   // App configurations controlled dynamically by the admin
   const [telegramLink, setTelegramLink] = useState("https://t.me/poketbrokar");
   const [globalAnnouncement, setGlobalAnnouncement] = useState("");
+  const [analysisReloadKey, setAnalysisReloadKey] = useState(0);
 
   const refreshCustomConfig = () => {
     try {
@@ -48,8 +49,55 @@ export default function App() {
 
       const storedAnnounce = localStorage.getItem("nila_custom_announcement_v1");
       if (storedAnnounce) setGlobalAnnouncement(storedAnnounce);
+      
+      setAnalysisReloadKey(prev => prev + 1);
     } catch (e) {
       console.error("Failed to load configs from storage", e);
+    }
+  };
+
+  // Analysis rate limiting (Max 3 per day per user account, excluding master account '00000000000')
+  const checkAnalysisLimit = (username: string): { allowed: boolean; remaining: number; count: number } => {
+    if (username === "00000000000") {
+      return { allowed: true, remaining: 999, count: 0 };
+    }
+    
+    try {
+      const limitDataStr = localStorage.getItem("nila_analysis_limits_v1") || "{}";
+      const limits: Record<string, number[]> = JSON.parse(limitDataStr);
+      
+      const userTimestamps = limits[username] || [];
+      const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+      const activeTimestamps = userTimestamps.filter(t => t > oneDayAgo);
+      
+      const count = activeTimestamps.length;
+      const remaining = Math.max(0, 3 - count);
+      return { allowed: remaining > 0, remaining, count };
+    } catch (e) {
+      console.error(e);
+      return { allowed: true, remaining: 3, count: 0 };
+    }
+  };
+
+  const incrementAnalysisCount = (username: string) => {
+    if (!username || username === "00000000000") return;
+    
+    try {
+      const limitDataStr = localStorage.getItem("nila_analysis_limits_v1") || "{}";
+      const limits: Record<string, number[]> = JSON.parse(limitDataStr);
+      
+      const userTimestamps = limits[username] || [];
+      userTimestamps.push(Date.now());
+      
+      // Keep only last 24 hours of logs to avoid infinite storage bloat
+      const oneDayAgo = Date.now() - 24 * 60 * 65 * 1000;
+      limits[username] = userTimestamps.filter(t => t > oneDayAgo);
+      
+      localStorage.setItem("nila_analysis_limits_v1", JSON.stringify(limits));
+      // Dispatch custom settings update event so limits reactively recalculate
+      window.dispatchEvent(new Event("nila_settings_updated"));
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -203,6 +251,18 @@ export default function App() {
       console.error("Local storage or window redirect failed", e);
     }
 
+    if (currentUser) {
+      const limitCheck = checkAnalysisLimit(currentUser);
+      if (!limitCheck.allowed) {
+        setErrorMsg(
+          language === "bn"
+            ? "দুঃখিত! আপনি ২৪ ঘণ্টায় সর্বোচ্চ ৩ টি ছবি অ্যানালাইসিস করার কোটা অতিক্রম করেছেন। দয়া করে আগামীকাল আবার চেষ্টা করুন।"
+            : "Sorry! You have exceeded the limit of 3 chart analyses per 24 hours. Please try again tomorrow."
+        );
+        return;
+      }
+    }
+
     setIsAnalyzing(true);
     setErrorMsg(null);
 
@@ -257,7 +317,21 @@ export default function App() {
       }
 
       if (errorText) {
-        throw new Error(errorText);
+        let finalError = errorText;
+        const lowerError = finalError.toLowerCase();
+        if (
+          lowerError.includes("429") ||
+          lowerError.includes("quota") ||
+          lowerError.includes("limit") ||
+          lowerError.includes("resource_exhausted") ||
+          lowerError.includes("rate limit") ||
+          lowerError.includes("exhausted")
+        ) {
+          finalError = language === "bn"
+            ? "আপনার জেমিনি (Gemini) API-এর লিমিট বা কোটা সাময়িকভাবে অতিক্রম হয়েছে। সাধারণ ফ্রি-টিয়ার অ্যাকাউন্টে অতিরিক্ত জলদি রিকোয়েস্ট পাঠালে এই ত্রুটিটি আসে। অনুগ্রহ করে ৩০ সেকেন্ড অপেক্ষা করে 'আবার চেষ্টা করুন' বাটনে চাপুন।"
+            : "Your Gemini API limit or quota has been temporarily exceeded. This error occurs heavily when rapid consecutive requests are sent on the free tier. Please wait 30 seconds and click 'Retry Analysis'.";
+        }
+        throw new Error(finalError);
       }
 
       if (!analyzedPayload) {
@@ -276,6 +350,10 @@ export default function App() {
       setHistory(updatedHistory);
       setActiveItem(newItem);
       saveHistoryToStorage(updatedHistory);
+
+      if (currentUser) {
+        incrementAnalysisCount(currentUser);
+      }
 
       // Reset work images to display analysis directly
       setSelectedImage(null);
@@ -493,6 +571,34 @@ export default function App() {
                   <p className="font-semibold leading-relaxed select-none">{globalAnnouncement}</p>
                 </div>
               )}
+
+              {/* Daily Analysis limit banner */}
+              {currentUser && currentUser !== "00000000000" && (
+                (() => {
+                  const limitInfo = checkAnalysisLimit(currentUser);
+                  return (
+                    <div className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs transition duration-150 ${
+                      limitInfo.remaining === 0 
+                        ? "bg-rose-950/20 border-rose-500/30 text-rose-300 animate-bounce" 
+                        : "bg-indigo-950/20 border-indigo-500/15 text-indigo-300"
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <Sparkles className={`w-3.5 h-3.5 ${limitInfo.remaining === 0 ? "text-rose-450" : "text-indigo-400 animate-pulse"}`} />
+                        <span className="font-semibold select-none">
+                          {language === "bn"
+                            ? "অ্যানালাইসিস দৈনিক লিমিট:"
+                            : "Daily Analysis Limit:"}
+                        </span>
+                      </div>
+                      <div className="font-mono font-bold text-right text-[11px]">
+                        {language === "bn"
+                          ? `${limitInfo.remaining} টি বাকি (৩ টির মধ্যে)`
+                          : `${limitInfo.remaining} remaining (out of 3)`}
+                      </div>
+                    </div>
+                  );
+                })()
+              )}
               {/* Active API Error state notification */}
               {errorMsg && (
                 <div id="api-error-alert" className="bg-rose-500/10 border-2 border-rose-500/40 text-rose-200 text-xs px-4 py-3.5 rounded-2xl flex flex-col gap-3 shadow-xl">
@@ -569,10 +675,17 @@ export default function App() {
                     <button
                       id="trigger-analysis-btn"
                       onClick={runAnalysis}
-                      className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3.5 px-4 rounded-2xl shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 transition duration-150 active:scale-95 cursor-pointer"
+                      disabled={currentUser !== "00000000000" && checkAnalysisLimit(currentUser || "").remaining <= 0}
+                      className={`w-full font-black py-3.5 px-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition duration-150 active:scale-95 cursor-pointer ${
+                        currentUser !== "00000000000" && checkAnalysisLimit(currentUser || "").remaining <= 0
+                          ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50 shadow-none"
+                          : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20"
+                      }`}
                     >
-                      <Search className="w-5 h-5 animate-pulse" />
-                      বিশ্লেষণ শুরু করুন
+                      <Search className="w-5 h-5" />
+                      {currentUser !== "00000000000" && checkAnalysisLimit(currentUser || "").remaining <= 0
+                        ? (language === "bn" ? "দৈনিক লিমিট শেষ (৩/৩)" : "Daily Limit Reached (3/3)")
+                        : (language === "bn" ? "বিশ্লেষণ শুরু করুন" : "Start Analysis")}
                     </button>
                     <button
                       id="cancel-image-selection-btn"
