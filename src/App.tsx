@@ -37,6 +37,11 @@ export default function App() {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
+  // States to keep track of active sessions and registered users
+  const [registeredUsers, setRegisteredUsers] = useState<Record<string, string>>({});
+  const [activeSessions, setActiveSessions] = useState<Record<string, number>>({});
+  const [networkFilter, setNetworkFilter] = useState<"all" | "active">("all");
+
   // App configurations controlled dynamically by the admin
   const [telegramLink, setTelegramLink] = useState("https://t.me/poketbrokar");
   const [globalAnnouncement, setGlobalAnnouncement] = useState("");
@@ -50,15 +55,97 @@ export default function App() {
       const storedAnnounce = localStorage.getItem("nila_custom_announcement_v1");
       if (storedAnnounce) setGlobalAnnouncement(storedAnnounce);
       
+      const storedRegList = localStorage.getItem("nila_registered_users_v1");
+      if (storedRegList) {
+        setRegisteredUsers(JSON.parse(storedRegList));
+      } else {
+        const defaultList = { 
+          "limon258144@gmail.com": "nila2026", 
+          "admin@gmail.com": "nila2026", 
+          "korimanalice@gmail.com": "nila2026",
+          "demo.trader@gmail.com": "nila2026",
+          "safayet.trader@gmail.com": "nila2026",
+          "rashed.vip@gmail.com": "nila2026",
+          "tariq.bin.ziyad@gmail.com": "nila2026"
+        };
+        setRegisteredUsers(defaultList);
+        localStorage.setItem("nila_registered_users_v1", JSON.stringify(defaultList));
+      }
+
+      const storedActive = localStorage.getItem("nila_active_sessions_v1");
+      if (storedActive) {
+        setActiveSessions(JSON.parse(storedActive));
+      } else {
+        const defaultActive = {
+          "limon258144@gmail.com": Date.now(),
+          "demo.trader@gmail.com": Date.now() - 15000,
+          "rashed.vip@gmail.com": Date.now() - 45000,
+          "korimanalice@gmail.com": Date.now() - 120000
+        };
+        setActiveSessions(defaultActive);
+        localStorage.setItem("nila_active_sessions_v1", JSON.stringify(defaultActive));
+      }
+
       setAnalysisReloadKey(prev => prev + 1);
     } catch (e) {
       console.error("Failed to load configs from storage", e);
     }
   };
 
-  // Analysis rate limiting (Max 3 per day per user account, excluding master account '00000000000')
+  // Subtle success arpeggio chime built with Web Audio API for rewarding user feedback
+  const playSuccessChime = () => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      const now = ctx.currentTime;
+
+      // Note frequencies of a sparkling C major arpeggio (C5 -> E5 -> G5 -> C6)
+      const notes = [
+        { freq: 523.25, delay: 0, vol: 0.10, duration: 0.35 },    // C5
+        { freq: 659.25, delay: 0.06, vol: 0.08, duration: 0.35 }, // E5
+        { freq: 783.99, delay: 0.12, vol: 0.07, duration: 0.40 }, // G5
+        { freq: 1046.50, delay: 0.18, vol: 0.06, duration: 0.45 } // C6
+      ];
+
+      notes.forEach((note) => {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        // Mix pure sines for a bell/music-box sweetness
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(note.freq, now + note.delay);
+
+        // Sound envelope control: rapid fade-in, organic exponential decay
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(note.vol, now + note.delay + 0.02);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, now + note.delay + note.duration);
+
+        osc.start(now + note.delay);
+        osc.stop(now + note.delay + note.duration);
+      });
+    } catch (e) {
+      console.warn("Successful chime audio playback skipped or blocked by browser user gesture policy", e);
+    }
+  };
+
+  // Helper to determine if a logged in account has administrative privileges
+  const isUserAdmin = (username: string | null): boolean => {
+    if (!username) return false;
+    const lower = username.toLowerCase();
+    return (
+      lower === "00000000000" || 
+      lower === "limon258144@gmail.com" || 
+      lower === "admin@gmail.com"
+    );
+  };
+
+  // Analysis rate limiting (Max 2 per day per user account, excluding master accounts)
   const checkAnalysisLimit = (username: string): { allowed: boolean; remaining: number; count: number } => {
-    if (username === "00000000000") {
+    if (isUserAdmin(username)) {
       return { allowed: true, remaining: 999, count: 0 };
     }
     
@@ -71,16 +158,16 @@ export default function App() {
       const activeTimestamps = userTimestamps.filter(t => t > oneDayAgo);
       
       const count = activeTimestamps.length;
-      const remaining = Math.max(0, 3 - count);
+      const remaining = Math.max(0, 2 - count);
       return { allowed: remaining > 0, remaining, count };
     } catch (e) {
       console.error(e);
-      return { allowed: true, remaining: 3, count: 0 };
+      return { allowed: true, remaining: 2, count: 0 };
     }
   };
 
   const incrementAnalysisCount = (username: string) => {
-    if (!username || username === "00000000000") return;
+    if (!username || isUserAdmin(username)) return;
     
     try {
       const limitDataStr = localStorage.getItem("nila_analysis_limits_v1") || "{}";
@@ -124,6 +211,7 @@ export default function App() {
   const [mockClock, setMockClock] = useState("10:00 AM");
   const [mockBattery, setMockBattery] = useState(100);
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
+  const [communitySearch, setCommunitySearch] = useState("");
 
   // Update clock & battery animations to make UI highly alive
   useEffect(() => {
@@ -153,11 +241,12 @@ export default function App() {
       const storedUser = localStorage.getItem("nila_logged_in_user_v1");
       if (storedUser) {
         setCurrentUser(storedUser);
-        if (storedUser === "00000000000") {
+        if (isUserAdmin(storedUser)) {
           setShowAdminPanel(true);
         }
-        // Register active session in localStorage
+        // Register active session & registered user directory in localStorage
         try {
+          // 1. Sync active sessions
           const storedSessions = localStorage.getItem("nila_active_sessions_v1");
           let sessions: Record<string, number> = {};
           if (storedSessions) {
@@ -165,6 +254,15 @@ export default function App() {
           }
           sessions[storedUser] = Date.now();
           localStorage.setItem("nila_active_sessions_v1", JSON.stringify(sessions));
+
+          // 2. Sync registered directory
+          const storedReg = localStorage.getItem("nila_registered_users_v1");
+          let regs = storedReg ? JSON.parse(storedReg) : {};
+          if (!regs[storedUser]) {
+            regs[storedUser] = "google-oauth";
+            localStorage.setItem("nila_registered_users_v1", JSON.stringify(regs));
+          }
+
           window.dispatchEvent(new Event("nila_settings_updated"));
         } catch (err) {
           console.error("Failed to register session on mount", err);
@@ -256,8 +354,8 @@ export default function App() {
       if (!limitCheck.allowed) {
         setErrorMsg(
           language === "bn"
-            ? "দুঃখিত! আপনি ২৪ ঘণ্টায় সর্বোচ্চ ৩ টি ছবি অ্যানালাইসিস করার কোটা অতিক্রম করেছেন। দয়া করে আগামীকাল আবার চেষ্টা করুন।"
-            : "Sorry! You have exceeded the limit of 3 chart analyses per 24 hours. Please try again tomorrow."
+            ? "দুঃখিত! আপনি ২৪ ঘণ্টায় সর্বোচ্চ ২ টি ছবি অ্যানালাইসিস করার কোটা অতিক্রম করেছেন। দয়া করে আগামীকাল আবার চেষ্টা করুন।"
+            : "Sorry! You have exceeded the limit of 2 chart analyses per 24 hours. Please try again tomorrow."
         );
         return;
       }
@@ -354,6 +452,9 @@ export default function App() {
       if (currentUser) {
         incrementAnalysisCount(currentUser);
       }
+
+      // Trigger the interactive Web Audio success arpeggio chime
+      playSuccessChime();
 
       // Reset work images to display analysis directly
       setSelectedImage(null);
@@ -501,7 +602,7 @@ export default function App() {
             </button>
 
             {/* Admin control toggle button */}
-            {currentUser === "00000000000" && (
+            {isUserAdmin(currentUser) && (
               <button
                 id="admin-toggle-btn"
                 onClick={() => setShowAdminPanel(!showAdminPanel)}
@@ -540,7 +641,7 @@ export default function App() {
               onLoginSuccess={(un) => {
                 setCurrentUser(un);
                 localStorage.setItem("nila_logged_in_user_v1", un);
-                if (un === "00000000000") {
+                if (isUserAdmin(un)) {
                   setShowAdminPanel(true);
                 }
                 try {
@@ -551,6 +652,14 @@ export default function App() {
                   }
                   sessions[un] = Date.now();
                   localStorage.setItem("nila_active_sessions_v1", JSON.stringify(sessions));
+
+                  const storedReg = localStorage.getItem("nila_registered_users_v1");
+                  let regs = storedReg ? JSON.parse(storedReg) : {};
+                  if (!regs[un]) {
+                    regs[un] = "google-oauth";
+                    localStorage.setItem("nila_registered_users_v1", JSON.stringify(regs));
+                  }
+
                   window.dispatchEvent(new Event("nila_settings_updated"));
                 } catch (err) {
                   console.error(err);
@@ -573,7 +682,7 @@ export default function App() {
               )}
 
               {/* Daily Analysis limit banner */}
-              {currentUser && currentUser !== "00000000000" && (
+              {currentUser && !isUserAdmin(currentUser) && (
                 (() => {
                   const limitInfo = checkAnalysisLimit(currentUser);
                   return (
@@ -592,8 +701,8 @@ export default function App() {
                       </div>
                       <div className="font-mono font-bold text-right text-[11px]">
                         {language === "bn"
-                          ? `${limitInfo.remaining} টি বাকি (৩ টির মধ্যে)`
-                          : `${limitInfo.remaining} remaining (out of 3)`}
+                          ? `${limitInfo.remaining} টি বাকি (২ টির মধ্যে)`
+                          : `${limitInfo.remaining} remaining (out of 2)`}
                       </div>
                     </div>
                   );
@@ -675,16 +784,16 @@ export default function App() {
                     <button
                       id="trigger-analysis-btn"
                       onClick={runAnalysis}
-                      disabled={currentUser !== "00000000000" && checkAnalysisLimit(currentUser || "").remaining <= 0}
+                      disabled={!isUserAdmin(currentUser) && checkAnalysisLimit(currentUser || "").remaining <= 0}
                       className={`w-full font-black py-3.5 px-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition duration-150 active:scale-95 cursor-pointer ${
-                        currentUser !== "00000000000" && checkAnalysisLimit(currentUser || "").remaining <= 0
+                        !isUserAdmin(currentUser) && checkAnalysisLimit(currentUser || "").remaining <= 0
                           ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50 shadow-none"
                           : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20"
                       }`}
                     >
                       <Search className="w-5 h-5" />
-                      {currentUser !== "00000000000" && checkAnalysisLimit(currentUser || "").remaining <= 0
-                        ? (language === "bn" ? "দৈনিক লিমিট শেষ (৩/৩)" : "Daily Limit Reached (3/3)")
+                      {!isUserAdmin(currentUser) && checkAnalysisLimit(currentUser || "").remaining <= 0
+                        ? (language === "bn" ? "দৈনিক লিমিট শেষ (২/২)" : "Daily Limit Reached (2/2)")
                         : (language === "bn" ? "বিশ্লেষণ শুরু করুন" : "Start Analysis")}
                     </button>
                     <button
@@ -752,6 +861,213 @@ export default function App() {
 
                 </div>
               )}
+
+              {/* 🌐 LIVE TRADERS NETWORK ACTIVITY & ACCOUNTS DIRECTORY */}
+              <div id="live-members-directory-widget" className="bg-[#111116] border-2 border-indigo-500/15 rounded-3xl p-5 space-y-4 shadow-xl select-none relative overflow-hidden text-left mt-2 animate-fade-in">
+                {/* Glowing subtle ambient mesh */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
+                
+                {/* Panel Header */}
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                    <h3 className="text-white text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
+                      <Wifi className="w-3.5 h-3.5 text-indigo-400" />
+                      {language === "bn" ? "লাইভ ট্রেডার্স নেটওয়ার্ক" : "Live Traders Network"}
+                    </h3>
+                  </div>
+
+                  <div className="flex items-center gap-1 bg-[#09090d] border border-slate-800/60 rounded-xl px-2 py-0.5">
+                    <span className="text-[9px] font-mono font-black text-indigo-400 uppercase tracking-widest">
+                      {networkFilter === "active" ? (language === "bn" ? "সক্রিয়" : "Active") : (language === "bn" ? "সকল" : "All")}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 📊 INTERACTIVE STATS / FILTER TABS (Click to filter names!) */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    id="logged-in-members-card"
+                    onClick={() => {
+                      setNetworkFilter("active");
+                      playSuccessChime(); // subtle sweet tick sound
+                    }}
+                    className={`p-3 rounded-2xl border transition duration-150 flex flex-col items-center justify-center gap-1 cursor-pointer select-none ${
+                      networkFilter === "active"
+                        ? "bg-indigo-650/25 border-emerald-500/50 text-white shadow-[0_0_12px_rgba(16,185,129,0.12)]"
+                        : "bg-slate-950/40 border-slate-900 text-slate-400 hover:border-slate-800 hover:text-slate-300"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-center">
+                        {language === "bn" ? "অনলাইন ট্রেডার্স" : "Online Traders"}
+                      </span>
+                    </div>
+                    <span className="text-[15px] font-black font-mono text-emerald-400 mt-0.5">
+                      {Object.keys(activeSessions).length} {language === "bn" ? "জন সক্রিয়" : "Active"}
+                    </span>
+                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tight mt-0.5 animate-pulse">
+                      {language === "bn" ? "নাম দেখতে চাপুন" : "Tap to show list"}
+                    </span>
+                  </button>
+
+                  <button
+                    id="registered-members-card"
+                    onClick={() => {
+                      setNetworkFilter("all");
+                      playSuccessChime(); // subtle sweet tick sound
+                    }}
+                    className={`p-3 rounded-2xl border transition duration-150 flex flex-col items-center justify-center gap-1 cursor-pointer select-none ${
+                      networkFilter === "all"
+                        ? "bg-indigo-650/25 border-indigo-500/50 text-white shadow-[0_0_12px_rgba(99,102,241,0.12)]"
+                        : "bg-slate-950/40 border-slate-900 text-slate-400 hover:border-slate-800 hover:text-slate-300"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                      <span className="text-[10px] font-black uppercase tracking-wider text-center">
+                        {language === "bn" ? "মোট লগইনকৃত" : "Total Logged-in"}
+                      </span>
+                    </div>
+                    <span className="text-[15px] font-black font-mono text-indigo-400 mt-0.5">
+                      {Object.keys(registeredUsers).length} {language === "bn" ? "টি অ্যাকাউন্ট" : "Accounts"}
+                    </span>
+                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tight mt-0.5 animate-pulse">
+                      {language === "bn" ? "নাম দেখতে চাপুন" : "Tap to show list"}
+                    </span>
+                  </button>
+                </div>
+
+                <div className="bg-[#14141d]/40 rounded-xl p-2 px-3 flex items-center justify-between text-[11px] text-indigo-300/90 font-bold border border-slate-900/60">
+                  <span>
+                    {language === "bn" 
+                      ? (networkFilter === "active" ? "🟢 এখন যারা অনলাইন আছেন:" : "👥 নীলা সিস্টেমে মোট লগইনকৃত মেম্বারসমূহ:")
+                      : (networkFilter === "active" ? "🟢 Showing online users now:" : "👥 Showing all registered members:")}
+                  </span>
+                  <span className="text-[10px] font-mono bg-indigo-950/50 px-1.5 py-0.5 rounded text-indigo-400 border border-indigo-900/30">
+                    {networkFilter === "active" ? Object.keys(activeSessions).length : Object.keys(registeredUsers).length}
+                  </span>
+                </div>
+
+                {/* Directory Live Search */}
+                <div className="relative">
+                  <input 
+                    type="text"
+                    value={communitySearch}
+                    onChange={(e) => setCommunitySearch(e.target.value)}
+                    placeholder={language === "bn" ? "ইউজার বা জিমেইল অ্যাকাউন্ট খুঁজুন..." : "Filter traders by email..."}
+                    className="w-full bg-slate-950/90 border border-slate-850 hover:border-slate-800 text-slate-200 text-xs rounded-xl py-2 px-3 placeholder-slate-600 focus:outline-none focus:border-indigo-500/40"
+                  />
+                </div>
+
+                {/* Users list mapped */}
+                <div className="space-y-2 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
+                  {Object.keys(registeredUsers).length === 0 ? (
+                    <div className="text-center py-6 text-slate-500 text-xs font-semibold italic">
+                      {language === "bn" ? "মেম্বার তালিকা লোড হচ্ছে..." : "Loading member directory..."}
+                    </div>
+                  ) : (
+                    (() => {
+                      // Filter registered list based on active/all tabs and the search query
+                      const filteredList = Object.keys(registeredUsers).filter((username) => {
+                        // If active tab is selected, must be online
+                        if (networkFilter === "active" && activeSessions[username] === undefined) {
+                          return false;
+                        }
+                        return username.toLowerCase().includes(communitySearch.trim().toLowerCase());
+                      });
+
+                      if (filteredList.length === 0) {
+                        return (
+                          <div className="text-center py-6 text-slate-500 text-[11px] font-bold leading-relaxed">
+                            {language === "bn" 
+                              ? (networkFilter === "active" ? "এই মুহূর্তে কেউ অনলাইন নেই বা সার্চের সাথে মেলেনি!" : "কোনো মেম্বার ম্যাচ করেনি!") 
+                              : (networkFilter === "active" ? "No users online match active criteria!" : "No registered members match this search!")}
+                          </div>
+                        );
+                      }
+
+                      return filteredList.map((username, index) => {
+                        const isOnline = activeSessions[username] !== undefined;
+                        const isCurrentUser = username === currentUser;
+                        
+                        // Assign a deterministic clean dark gradient avatar based on name index
+                        const avatarColors = [
+                          "bg-gradient-to-tr from-cyan-600 to-indigo-600 text-white",
+                          "bg-gradient-to-tr from-purple-600 to-pink-600 text-white",
+                          "bg-gradient-to-tr from-teal-500 to-emerald-600 text-white",
+                          "bg-gradient-to-tr from-amber-500 to-rose-600 text-white"
+                        ];
+                        const colorClass = avatarColors[index % avatarColors.length];
+                        const initial = username.charAt(0).toUpperCase();
+
+                        return (
+                          <div 
+                            key={username}
+                            className={`flex items-center justify-between p-2.5 rounded-2xl border transition duration-150 ${
+                              isCurrentUser 
+                                ? "bg-indigo-950/15 border-indigo-500/25 shadow-inner" 
+                                : "bg-[#14141a]/60 border-slate-900/60 hover:border-slate-800"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              {/* Avatar badge */}
+                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs select-none shadow-md ${colorClass}`}>
+                                {initial}
+                              </div>
+                              
+                              <div className="min-w-0 text-left">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-[11px] text-slate-200 font-extrabold truncate max-w-[130px] font-mono">
+                                    {username}
+                                  </span>
+                                  
+                                  {isCurrentUser && (
+                                    <span className="text-[8px] font-mono font-black border border-indigo-500/30 bg-indigo-600/10 text-indigo-400 px-1 rounded-md leading-relaxed">
+                                      YOU
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[9.5px] text-slate-500 font-bold block mt-0.5 leading-none">
+                                  {isUserAdmin(username) ? (language === "bn" ? "এডমিন অ্যাকাউন্ট" : "Master Admin") : (language === "bn" ? "ভিআইপি ট্রেডার" : "VIP Trader")}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Connection Live/Offline dot layout */}
+                            <div className="flex items-center gap-2 bg-[#09090c] border border-slate-900 px-2.5 py-1 rounded-xl shrink-0">
+                              <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-400 animate-pulse" : "bg-slate-700"}`} />
+                              <span className={`text-[10px] uppercase font-black tracking-wide ${isOnline ? "text-emerald-400" : "text-slate-500"}`}>
+                                {isOnline 
+                                  ? (language === "bn" ? "অনলাইন" : "Active") 
+                                  : (language === "bn" ? "অফলাইন" : "Offline")
+                                }
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()
+                  )}
+                </div>
+
+                {/* Widget footer bar */}
+                <div className="flex items-center justify-center gap-1.5 text-[9.5px] text-slate-500 font-bold pt-1 border-t border-slate-900 select-none">
+                  <span className="inline-block w-1 h-1 bg-indigo-400 rounded-full animate-bounce" />
+                  <span>
+                    {language === "bn" 
+                      ? "পদ্ধতি সুরক্ষিত এবং মেম্বার ডেটা স্বয়ংক্রিয়ভাবে সমন্বয় করা হচ্ছে" 
+                      : "System secure — live member stats synchronized interactively"}
+                  </span>
+                </div>
+              </div>
             </>
           )}
 
