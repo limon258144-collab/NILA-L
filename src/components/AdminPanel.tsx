@@ -48,14 +48,14 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
   const loadUsersAndStats = () => {
     try {
       // 1. Get users
-      const storedUsers = localStorage.getItem("nila_registered_users_v1");
+      const storedUsers = localStorage.getItem("nila_registered_users_v2");
       if (storedUsers) {
         setUsers(JSON.parse(storedUsers));
       } else {
-        // fallbacks
-        const defaultList = { "admin": "123", "limon": "nila2026", "korim": "nila2026" };
+        // Build with empty list as requested by user
+        const defaultList = {};
         setUsers(defaultList);
-        localStorage.setItem("nila_registered_users_v1", JSON.stringify(defaultList));
+        localStorage.setItem("nila_registered_users_v2", JSON.stringify(defaultList));
       }
 
       // 2. Load configurations
@@ -143,7 +143,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
     }
 
     const updated = { ...users, [cleanUsername]: newPassword };
-    localStorage.setItem("nila_registered_users_v1", JSON.stringify(updated));
+    localStorage.setItem("nila_registered_users_v2", JSON.stringify(updated));
     setUsers(updated);
     
     setNewUsername("");
@@ -486,7 +486,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
                 onClick={() => {
                   const updated = { ...users };
                   delete updated[userToDelete];
-                  localStorage.setItem("nila_registered_users_v1", JSON.stringify(updated));
+                  localStorage.setItem("nila_registered_users_v2", JSON.stringify(updated));
                   setUsers(updated);
                   setUserToDelete(null);
                   window.dispatchEvent(new Event("nila_settings_updated"));

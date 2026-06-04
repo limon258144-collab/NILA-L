@@ -55,17 +55,9 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
 
   // Dynamically load registered user accounts from localStorage or fallbacks
   const getDynamicAccounts = () => {
-    let regs: Record<string, string> = {
-      "limon258144@gmail.com": "nila2026", 
-      "admin@gmail.com": "nila2026", 
-      "korimanalice@gmail.com": "nila2026",
-      "demo.trader@gmail.com": "nila2026",
-      "safayet.trader@gmail.com": "nila2026",
-      "rashed.vip@gmail.com": "nila2026",
-      "tariq.bin.ziyad@gmail.com": "nila2026"
-    };
+    let regs: Record<string, string> = {};
     try {
-      const stored = localStorage.getItem("nila_registered_users_v1");
+      const stored = localStorage.getItem("nila_registered_users_v2");
       if (stored) {
         const parsed = JSON.parse(stored);
         if (typeof parsed === "object" && parsed !== null) {
@@ -152,9 +144,9 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
       setShowChooser(false);
       // Store in users locally for traceability
       try {
-        const users = JSON.parse(localStorage.getItem("nila_registered_users_v1") || "{}");
+        const users = JSON.parse(localStorage.getItem("nila_registered_users_v2") || "{}");
         users[cleanMail] = "google-oauth";
-        localStorage.setItem("nila_registered_users_v1", JSON.stringify(users));
+        localStorage.setItem("nila_registered_users_v2", JSON.stringify(users));
       } catch (err) {
         console.error(err);
       }
@@ -188,18 +180,10 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
     }
 
     // Load actual users
-    let regs: Record<string, string> = {
-      "limon258144@gmail.com": "nila2026", 
-      "admin@gmail.com": "nila2026", 
-      "korimanalice@gmail.com": "nila2026",
-      "demo.trader@gmail.com": "nila2026",
-      "safayet.trader@gmail.com": "nila2026",
-      "rashed.vip@gmail.com": "nila2026",
-      "tariq.bin.ziyad@gmail.com": "nila2026"
-    };
+    let regs: Record<string, string> = {};
 
     try {
-      const stored = localStorage.getItem("nila_registered_users_v1");
+      const stored = localStorage.getItem("nila_registered_users_v2");
       if (stored) {
         const parsed = JSON.parse(stored);
         if (typeof parsed === "object" && parsed !== null) {
@@ -282,18 +266,10 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
     }
 
     // Load actual users
-    let regs: Record<string, string> = {
-      "limon258144@gmail.com": "nila2026", 
-      "admin@gmail.com": "nila2026", 
-      "korimanalice@gmail.com": "nila2026",
-      "demo.trader@gmail.com": "nila2026",
-      "safayet.trader@gmail.com": "nila2026",
-      "rashed.vip@gmail.com": "nila2026",
-      "tariq.bin.ziyad@gmail.com": "nila2026"
-    };
+    let regs: Record<string, string> = {};
 
     try {
-      const stored = localStorage.getItem("nila_registered_users_v1");
+      const stored = localStorage.getItem("nila_registered_users_v2");
       if (stored) {
         const parsed = JSON.parse(stored);
         if (typeof parsed === "object" && parsed !== null) {
@@ -316,7 +292,7 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
     // Write back
     regs[email] = password;
     try {
-      localStorage.setItem("nila_registered_users_v1", JSON.stringify(regs));
+      localStorage.setItem("nila_registered_users_v2", JSON.stringify(regs));
     } catch (err) {
       console.error(err);
     }

@@ -55,21 +55,13 @@ export default function App() {
       const storedAnnounce = localStorage.getItem("nila_custom_announcement_v1");
       if (storedAnnounce) setGlobalAnnouncement(storedAnnounce);
       
-      const storedRegList = localStorage.getItem("nila_registered_users_v1");
+      const storedRegList = localStorage.getItem("nila_registered_users_v2");
       if (storedRegList) {
         setRegisteredUsers(JSON.parse(storedRegList));
       } else {
-        const defaultList = { 
-          "limon258144@gmail.com": "nila2026", 
-          "admin@gmail.com": "nila2026", 
-          "korimanalice@gmail.com": "nila2026",
-          "demo.trader@gmail.com": "nila2026",
-          "safayet.trader@gmail.com": "nila2026",
-          "rashed.vip@gmail.com": "nila2026",
-          "tariq.bin.ziyad@gmail.com": "nila2026"
-        };
+        const defaultList = {};
         setRegisteredUsers(defaultList);
-        localStorage.setItem("nila_registered_users_v1", JSON.stringify(defaultList));
+        localStorage.setItem("nila_registered_users_v2", JSON.stringify(defaultList));
       }
 
       const storedActive = localStorage.getItem("nila_active_sessions_v1");
@@ -256,11 +248,11 @@ export default function App() {
           localStorage.setItem("nila_active_sessions_v1", JSON.stringify(sessions));
 
           // 2. Sync registered directory
-          const storedReg = localStorage.getItem("nila_registered_users_v1");
+          const storedReg = localStorage.getItem("nila_registered_users_v2");
           let regs = storedReg ? JSON.parse(storedReg) : {};
           if (!regs[storedUser]) {
             regs[storedUser] = "google-oauth";
-            localStorage.setItem("nila_registered_users_v1", JSON.stringify(regs));
+            localStorage.setItem("nila_registered_users_v2", JSON.stringify(regs));
           }
 
           window.dispatchEvent(new Event("nila_settings_updated"));
@@ -677,11 +669,11 @@ export default function App() {
                   sessions[un] = Date.now();
                   localStorage.setItem("nila_active_sessions_v1", JSON.stringify(sessions));
 
-                  const storedReg = localStorage.getItem("nila_registered_users_v1");
+                  const storedReg = localStorage.getItem("nila_registered_users_v2");
                   let regs = storedReg ? JSON.parse(storedReg) : {};
                   if (!regs[un]) {
                     regs[un] = "google-oauth";
-                    localStorage.setItem("nila_registered_users_v1", JSON.stringify(regs));
+                    localStorage.setItem("nila_registered_users_v2", JSON.stringify(regs));
                   }
 
                   window.dispatchEvent(new Event("nila_settings_updated"));
