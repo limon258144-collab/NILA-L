@@ -43,7 +43,7 @@ export default function App() {
   const [networkFilter, setNetworkFilter] = useState<"all" | "active">("all");
 
   // App configurations controlled dynamically by the admin
-  const [telegramLink, setTelegramLink] = useState("https://t.me/poketbrokar");
+  const [telegramLink, setTelegramLink] = useState("https://t.me/addmineanlice");
   const [globalAnnouncement, setGlobalAnnouncement] = useState("");
   const [analysisReloadKey, setAnalysisReloadKey] = useState(0);
 
@@ -569,8 +569,17 @@ export default function App() {
         {/* Dynamic Compact Interactive Main Header */}
         <header className="bg-[#0f111a]/95 border-b border-indigo-500/15 backdrop-blur-md px-4 py-3.5 flex items-center justify-between sticky top-0 z-40 select-none">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-600/30">
-              <TrendingUp className="w-4 h-4 text-white animate-pulse" />
+            <div 
+              onClick={() => window.open(telegramLink, "_blank")}
+              className="px-2.5 h-8 bg-indigo-600 hover:bg-indigo-500 rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/30 cursor-pointer active:scale-95 transition"
+              title="Inbox Admin"
+            >
+              <span className="text-[11px] font-bold text-indigo-200 font-mono tracking-normal leading-none select-none">
+                (* ￣︿￣)
+              </span>
+              <span className="text-[9px] font-black text-white tracking-widest uppercase whitespace-nowrap">
+                inbox admin
+              </span>
             </div>
             <div>
               <h1 className="text-sm font-black font-display text-white tracking-tight flex items-center gap-1">

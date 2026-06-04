@@ -150,7 +150,7 @@ export default function AnalysisResult({ analysis, language, imageFileName, imag
         </p>
         <div className="flex items-center justify-between px-1 text-[10.5px] font-mono font-bold tracking-wider">
           <div 
-            onClick={() => window.open(telegram, "_blank")}
+            onClick={() => window.open("https://t.me/analicegrope", "_blank")}
             className="tg-interactive-glow flex items-center gap-1.5 cursor-pointer transition-colors duration-150 active:scale-95 hover:underline decoration-sky-400/50"
           >
             <svg className="w-3.5 h-3.5 fill-current shrink-0 text-sky-400" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -160,7 +160,7 @@ export default function AnalysisResult({ analysis, language, imageFileName, imag
           </div>
           
           <div 
-            onClick={() => window.open(telegram, "_blank")}
+            onClick={() => window.open("https://t.me/analicegrope", "_blank")}
             className="tg-interactive-glow flex items-center gap-1.5 cursor-pointer transition-colors duration-150 active:scale-95 hover:underline decoration-sky-400/50"
           >
             <svg className="w-3.5 h-3.5 fill-current shrink-0 text-sky-400" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

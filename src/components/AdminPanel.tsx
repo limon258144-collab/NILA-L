@@ -37,7 +37,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
   const [adminAlertMsg, setAdminAlertMsg] = useState<string | null>(null);
 
   // App variables/settings form state
-  const [adminTelegram, setAdminTelegram] = useState("https://t.me/poketbrokar");
+  const [adminTelegram, setAdminTelegram] = useState("https://t.me/addmineanlice");
   const [adminOwner1, setAdminOwner1] = useState("nila\\ldp.onar");
   const [adminOwner2, setAdminOwner2] = useState("korim debolopar");
   const [adminWinRate, setAdminWinRate] = useState("98%");
@@ -180,9 +180,6 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
       {/* Admin Title badge & Return Action bar */}
       <div className="flex items-center justify-between bg-indigo-950/20 border-2 border-indigo-500/30 rounded-3xl p-4">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shrink-0">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
           <div>
             <h2 className="text-white font-black text-sm uppercase tracking-wide flex items-center gap-1.5 leading-none">
               {language === "bn" ? "নিয়ন্ত্রণ প্যানেল" : "ADMIN CONTROLS"}
