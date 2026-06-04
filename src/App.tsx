@@ -400,14 +400,14 @@ export default function App() {
           }
         } else {
           try {
-            analyzedPayload = JSON.parse(text) as TradingAnalysis;
-          } catch (jsonErr) {
+            const trimmedText = text.trim();
+            if (!trimmedText.startsWith("{") && !trimmedText.startsWith("[")) {
+              throw new Error("eror dblpr");
+            }
+            analyzedPayload = JSON.parse(trimmedText) as TradingAnalysis;
+          } catch (jsonErr: any) {
             console.error("Failed to parse successful analysis JSON:", jsonErr);
-            throw new Error(
-              language === "bn"
-                ? "সার্ভার থেকে প্রাপ্ত তথ্য সঠিক প্যাটার্নে নেই। দয়া করে আবার চেষ্টা করুন।"
-                : "Invalid response pattern received from the server. Please try again."
-            );
+            throw new Error("eror dblpr");
           }
         }
       } catch (parseFail: any) {
@@ -415,26 +415,7 @@ export default function App() {
       }
 
       if (errorText) {
-        let finalError = errorText;
-        const lowerError = finalError.toLowerCase();
-        if (
-          lowerError.includes("429") ||
-          lowerError.includes("quota") ||
-          lowerError.includes("limit") ||
-          lowerError.includes("resource_exhausted") ||
-          lowerError.includes("rate limit") ||
-          lowerError.includes("exhausted") ||
-          lowerError.includes("503") ||
-          lowerError.includes("unavailable") ||
-          lowerError.includes("high demand") ||
-          lowerError.includes("temporary") ||
-          lowerError.includes("spikes") ||
-          lowerError.includes("apierror") ||
-          lowerError.includes("api-error")
-        ) {
-          finalError = "eror dblpr";
-        }
-        throw new Error(finalError);
+        throw new Error(errorText);
       }
 
       if (!analyzedPayload) {
@@ -469,7 +450,8 @@ export default function App() {
       console.error(err);
       let errMsg = err.message || t.serverOffline;
       const lowerErr = errMsg.toLowerCase();
-      if (
+      
+      const isQuotaError = 
         lowerErr.includes("quota") ||
         lowerErr.includes("limit") ||
         lowerErr.includes("429") ||
@@ -482,9 +464,27 @@ export default function App() {
         lowerErr.includes("spikes") ||
         lowerErr.includes("apierror") ||
         lowerErr.includes("api-error") ||
-        lowerErr.includes("unvailable")
-      ) {
-        errMsg = "eror dblpr";
+        lowerErr.includes("unvailable");
+        
+      const isParseError = 
+        lowerErr.includes("json") ||
+        lowerErr.includes("syntaxerror") ||
+        lowerErr.includes("unexpected token") ||
+        lowerErr.includes("doctype") ||
+        lowerErr.includes("pattern") ||
+        lowerErr.includes("সার্ভার") ||
+        lowerErr.includes("invalid response") ||
+        lowerErr.includes("failed to parse") ||
+        lowerErr.includes("eror dblpr");
+
+      if (isQuotaError) {
+        errMsg = language === "bn"
+          ? "কোটা বা রিকোয়েস্টের সীমা অতিক্রম হয়েছে (Gemini API Quota Exceeded)। অনুগ্রহ করে কিছুক্ষণ (৪০-৫০ সেকেন্ড) অপেক্ষা করে আবার চেষ্টা করুন।"
+          : "Gemini API Quota or Rate Limit exceeded. Please wait a bit and try again shortly (approx 40 seconds).";
+      } else if (isParseError) {
+        errMsg = language === "bn"
+          ? "দুঃখিত, চার্ট ছবিটি সঠিকভাবে অ্যানালাইসিস করা যায়নি (সার্ভার রেসপন্স ত্রুটি)। অনুগ্রহ করে আরেকটি পরিষ্কার ছবি দিয়ে চেষ্টা করুন।"
+          : "Sorry, the chart image could not be analyzed correctly (Server response error). Please try uploading another clean chart image.";
       }
       setErrorMsg(errMsg);
     } finally {
@@ -742,8 +742,8 @@ export default function App() {
                         <p className="font-extrabold text-rose-300">
                           {language === "bn" ? "অ্যানালাইসিস ত্রুটি" : "Analysis Failed"}
                         </p>
-                        <span className="text-[10px] font-mono font-black bg-rose-950/80 text-rose-400 border border-rose-500/40 px-2 py-0.5 rounded-md animate-pulse shrink-0 select-none tracking-wider">
-                          eror dblpr
+                        <span className="text-[10px] font-mono font-black bg-rose-950/80 text-rose-400 border border-rose-500/40 px-2 py-0.5 rounded-md animate-pulse shrink-0 select-none tracking-wider font-semibold">
+                          {errorMsg && (errorMsg.includes("Quota") || errorMsg.includes("কোটা")) ? "QUOTA_LIMIT" : "SYS_ERROR"}
                         </span>
                       </div>
                       <p className="opacity-90 leading-relaxed text-rose-200/90">{errorMsg}</p>
@@ -894,7 +894,8 @@ export default function App() {
               )}
 
               {/* 🌐 LIVE TRADERS NETWORK ACTIVITY & ACCOUNTS DIRECTORY */}
-              <div id="live-members-directory-widget" className="bg-[#111116] border-2 border-indigo-500/15 rounded-3xl p-5 space-y-4 shadow-xl select-none relative overflow-hidden text-left mt-2 animate-fade-in">
+              {isUserAdmin(currentUser) && (
+                <div id="live-members-directory-widget" className="bg-[#111116] border-2 border-indigo-500/15 rounded-3xl p-5 space-y-4 shadow-xl select-none relative overflow-hidden text-left mt-2 animate-fade-in">
                 {/* Glowing subtle ambient mesh */}
                 <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
                 
@@ -1099,6 +1100,7 @@ export default function App() {
                   </span>
                 </div>
               </div>
+              )}
             </>
           )}
 

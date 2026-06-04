@@ -1,4 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
+import dotenv from "dotenv";
+
+dotenv.config({ override: true });
 
 // Lazy initializer for Google GenAI client to prevent crashing on startup when key is missing
 let aiClient = null;
@@ -74,94 +77,115 @@ export default async function handler(req, res) {
       Provide your analysis strictly in valid JSON matching the requested response schema format. Do not prepend markdown formatting inside the json fields. Treat this as an educational and statistical pattern match tool.
     `;
 
-    // Make the Gemini API call safely using gemini-3.5-flash
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: [
-        {
-          inlineData: {
-            data: base64Data,
-            mimeType: mimeType,
-          },
-        },
-        {
-          text: promptText,
-        },
-      ],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "OBJECT",
-          properties: {
-            prediction: {
-              type: "STRING",
-              description: "Predicted direction of the next candle: 'Up' (Bullish/Call), 'Down' (Bearish/Put), or 'Neutral'."
+    // Progressive model fallback list to ensure robustness against high demand / free plan quotas
+    const candidateModels = ["gemini-2.5-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite"];
+    let response = null;
+    let lastModelError = null;
+
+    for (const modelName of candidateModels) {
+      try {
+        console.log(`Attempting technical analysis using model: ${modelName}`);
+        response = await ai.models.generateContent({
+          model: modelName,
+          contents: [
+            {
+              inlineData: {
+                data: base64Data,
+                mimeType: mimeType,
+              },
             },
-            priceCloseUpEntry: {
-              type: "STRING",
-              description: "At which closing price or breakout condition should we take an UP trade? Be highly specific."
+            {
+              text: promptText,
             },
-            priceCloseDownEntry: {
-              type: "STRING",
-              description: "At which closing price or breakdown condition should we take a DOWN trade? Be highly specific."
-            },
-            confidence: {
-              type: "INTEGER",
-              description: "Confidence level of this prediction (percentage 0 to 100)."
-            },
-            supportLevels: {
-              type: "ARRAY",
-              items: { type: "STRING" },
-              description: "Key support levels identified from the chart."
-            },
-            resistanceLevels: {
-              type: "ARRAY",
-              items: { type: "STRING" },
-              description: "Key resistance levels identified from the chart."
-            },
-            patternsIdentified: {
-              type: "ARRAY",
-              items: { type: "STRING" },
-              description: "Specific chart pattern, indicator setups, or candlestick formations identified."
-            },
-            reasoning: {
-              type: "STRING",
-              description: "Detailed professional technical analysis reasoning in English."
-            },
-            reasoningBangla: {
-              type: "STRING",
-              description: "Complete technical analysis reasoning in highly-clear Bengali language (বাংলা) explaining patterns and price action."
-            },
-            recommendation: {
-              type: "STRING",
-              description: "Trade execution guidance and warnings in English."
-            },
-            recommendationBangla: {
-              type: "STRING",
-              description: "Trade execution guidance and warnings in Bengali language (বাংলা)."
-            },
-            riskRewardRatio: {
-              type: "STRING",
-              description: "Suggested Risk-to-Reward ratio (e.g. '1:2', '1:1.5')."
-            },
-            suggestedStopLoss: {
-              type: "STRING",
-              description: "Stop Loss level suggesting where to exit if trade goes wrong."
-            },
-            suggestedTakeProfit: {
-              type: "STRING",
-              description: "Take Profit level suggesting where to secure gains."
+          ],
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "OBJECT",
+              properties: {
+                prediction: {
+                  type: "STRING",
+                  description: "Predicted direction of the next candle: 'Up' (Bullish/Call), 'Down' (Bearish/Put), or 'Neutral'."
+                },
+                priceCloseUpEntry: {
+                  type: "STRING",
+                  description: "At which closing price or breakout condition should we take an UP trade? Be highly specific."
+                },
+                priceCloseDownEntry: {
+                  type: "STRING",
+                  description: "At which closing price or breakdown condition should we take a DOWN trade? Be highly specific."
+                },
+                confidence: {
+                  type: "INTEGER",
+                  description: "Confidence level of this prediction (percentage 0 to 100)."
+                },
+                supportLevels: {
+                  type: "ARRAY",
+                  items: { type: "STRING" },
+                  description: "Key support levels identified from the chart."
+                },
+                resistanceLevels: {
+                  type: "ARRAY",
+                  items: { type: "STRING" },
+                  description: "Key resistance levels identified from the chart."
+                },
+                patternsIdentified: {
+                  type: "ARRAY",
+                  items: { type: "STRING" },
+                  description: "Specific chart pattern, indicator setups, or candlestick formations identified."
+                },
+                reasoning: {
+                  type: "STRING",
+                  description: "Detailed professional technical analysis reasoning in English."
+                },
+                reasoningBangla: {
+                  type: "STRING",
+                  description: "Complete technical analysis reasoning in highly-clear Bengali language (বাংলা) explaining patterns and price action."
+                },
+                recommendation: {
+                  type: "STRING",
+                  description: "Trade execution guidance and warnings in English."
+                },
+                recommendationBangla: {
+                  type: "STRING",
+                  description: "Trade execution guidance and warnings in Bengali language (বাংলা)."
+                },
+                riskRewardRatio: {
+                  type: "STRING",
+                  description: "Suggested Risk-to-Reward ratio (e.g. '1:2', '1:1.5')."
+                },
+                suggestedStopLoss: {
+                  type: "STRING",
+                  description: "Stop Loss level suggesting where to exit if trade goes wrong."
+                },
+                suggestedTakeProfit: {
+                  type: "STRING",
+                  description: "Take Profit level suggesting where to secure gains."
+                }
+              },
+              required: [
+                "prediction", "priceCloseUpEntry", "priceCloseDownEntry", "confidence",
+                "supportLevels", "resistanceLevels", "patternsIdentified", "reasoning",
+                "reasoningBangla", "recommendation", "recommendationBangla", "riskRewardRatio",
+                "suggestedStopLoss", "suggestedTakeProfit"
+              ]
             }
-          },
-          required: [
-            "prediction", "priceCloseUpEntry", "priceCloseDownEntry", "confidence",
-            "supportLevels", "resistanceLevels", "patternsIdentified", "reasoning",
-            "reasoningBangla", "recommendation", "recommendationBangla", "riskRewardRatio",
-            "suggestedStopLoss", "suggestedTakeProfit"
-          ]
+          }
+        });
+
+        if (response && response.text) {
+          console.log(`Technical analysis successfully completed using model: ${modelName}`);
+          break;
         }
+      } catch (err) {
+        console.warn(`Model ${modelName} failed or encountered rate limits. Trying next model. Error details:`, err);
+        lastModelError = err;
       }
-    });
+    }
+
+    if (!response || !response.text) {
+      throw lastModelError || new Error("All candidate models failed or returned empty response content.");
+    }
 
     const analysisText = response.text;
     if (!analysisText) {
