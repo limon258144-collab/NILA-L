@@ -423,11 +423,16 @@ export default function App() {
           lowerError.includes("limit") ||
           lowerError.includes("resource_exhausted") ||
           lowerError.includes("rate limit") ||
-          lowerError.includes("exhausted")
+          lowerError.includes("exhausted") ||
+          lowerError.includes("503") ||
+          lowerError.includes("unavailable") ||
+          lowerError.includes("high demand") ||
+          lowerError.includes("temporary") ||
+          lowerError.includes("spikes") ||
+          lowerError.includes("apierror") ||
+          lowerError.includes("api-error")
         ) {
-          finalError = language === "bn"
-            ? "আপনার জেমিনি (Gemini) API-এর লিমিট বা কোটা সাময়িকভাবে অতিক্রম হয়েছে। সাধারণ ফ্রি-টিয়ার অ্যাকাউন্টে অতিরিক্ত জলদি রিকোয়েস্ট পাঠালে এই ত্রুটিটি আসে। অনুগ্রহ করে ৩০ সেকেন্ড অপেক্ষা করে 'আবার চেষ্টা করুন' বাটনে চাপুন।"
-            : "Your Gemini API limit or quota has been temporarily exceeded. This error occurs heavily when rapid consecutive requests are sent on the free tier. Please wait 30 seconds and click 'Retry Analysis'.";
+          finalError = "eror dblpr";
         }
         throw new Error(finalError);
       }
@@ -462,7 +467,26 @@ export default function App() {
 
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(err.message || t.serverOffline);
+      let errMsg = err.message || t.serverOffline;
+      const lowerErr = errMsg.toLowerCase();
+      if (
+        lowerErr.includes("quota") ||
+        lowerErr.includes("limit") ||
+        lowerErr.includes("429") ||
+        lowerErr.includes("rate limit") ||
+        lowerErr.includes("exhausted") ||
+        lowerErr.includes("503") ||
+        lowerErr.includes("unavailable") ||
+        lowerErr.includes("high demand") ||
+        lowerErr.includes("temporary") ||
+        lowerErr.includes("spikes") ||
+        lowerErr.includes("apierror") ||
+        lowerErr.includes("api-error") ||
+        lowerErr.includes("unvailable")
+      ) {
+        errMsg = "eror dblpr";
+      }
+      setErrorMsg(errMsg);
     } finally {
       setIsAnalyzing(false);
     }
@@ -712,10 +736,17 @@ export default function App() {
               {errorMsg && (
                 <div id="api-error-alert" className="bg-rose-500/10 border-2 border-rose-500/40 text-rose-200 text-xs px-4 py-3.5 rounded-2xl flex flex-col gap-3 shadow-xl">
                   <div className="flex items-start gap-2.5 w-full">
-                    <AlertCircle className="w-5 h-5 text-rose-450 shrink-0 mt-0.5" />
-                    <div className="space-y-1 w-full text-left">
-                      <p className="font-extrabold">{language === "bn" ? "অ্যানালাইসিস ত্রুটি" : "Analysis Failed"}</p>
-                      <p className="opacity-90">{errorMsg}</p>
+                    <AlertCircle className="w-5 h-5 text-rose-450 shrink-0 mt-0.5 animate-pulse" />
+                    <div className="space-y-1.5 w-full text-left">
+                      <div className="flex items-center justify-between gap-2 w-full">
+                        <p className="font-extrabold text-rose-300">
+                          {language === "bn" ? "অ্যানালাইসিস ত্রুটি" : "Analysis Failed"}
+                        </p>
+                        <span className="text-[10px] font-mono font-black bg-rose-950/80 text-rose-400 border border-rose-500/40 px-2 py-0.5 rounded-md animate-pulse shrink-0 select-none tracking-wider">
+                          eror dblpr
+                        </span>
+                      </div>
+                      <p className="opacity-90 leading-relaxed text-rose-200/90">{errorMsg}</p>
                     </div>
                   </div>
 
