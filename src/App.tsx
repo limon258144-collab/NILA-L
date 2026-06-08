@@ -195,10 +195,11 @@ export default function App() {
         try {
           const currentPaymentsStr = localStorage.getItem("nila_submitted_payments_v1") || "[]";
           const payments = JSON.parse(currentPaymentsStr);
+          const isBkash = selectedNetwork === "bKash (বিকাশ)";
           const payItem = {
             id: "pay_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
             username: currentUser || "unknown",
-            paymentMethod: "crypto",
+            paymentMethod: isBkash ? "bKash" : "crypto",
             network: selectedNetwork,
             amount: numericAmount,
             transactionId: cleanTx,
@@ -229,6 +230,62 @@ export default function App() {
         }
       }, 1600);
     }, 1400);
+  };
+
+  const handleQuickBkashRequest = () => {
+    setSelectedNetwork("bKash (বিকাশ)");
+    setPayError(null);
+    setPaySuccess(null);
+    setIsVerifyingTx(true);
+    setVerificationStep(1);
+
+    setTimeout(() => {
+      setVerificationStep(2);
+      
+      setTimeout(() => {
+        try {
+          const currentPaymentsStr = localStorage.getItem("nila_submitted_payments_v1") || "[]";
+          const payments = JSON.parse(currentPaymentsStr);
+          
+          const txChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+          let bkashTx = "8N";
+          for (let i = 0; i < 8; i++) {
+            bkashTx += txChars.charAt(Math.floor(Math.random() * txChars.length));
+          }
+
+          const payItem = {
+            id: "pay_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+            username: currentUser || "unknown",
+            paymentMethod: "bKash",
+            network: "bKash (বিকাশ)",
+            amount: 20.00,
+            transactionId: bkashTx,
+            senderNumber: senderNumber || walletLTC || "01568760651",
+            timestamp: Date.now(),
+            status: "pending"
+          };
+          
+          payments.push(payItem);
+          localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(payments));
+          
+          setIsVerifyingTx(false);
+          setVerificationStep(0);
+          setPaySuccess(
+            language === "bn"
+              ? "বিকাশ ভেরিফিকেশন রিকোয়েস্ট সরাসরি অ্যাডমিনের কাছে পাঠানো হয়েছে! অ্যাডমিন প্যানেল (Verification Queue) থেকে অ্যাপ্রুভ করুন।"
+              : "bKash verification request successfully sent! Please approve it from Admin Panel (Verification Queue)."
+          );
+          
+          playSuccessChime();
+          window.dispatchEvent(new Event("nila_settings_updated"));
+        } catch (err) {
+          console.error(err);
+          setIsVerifyingTx(false);
+          setVerificationStep(0);
+          setPayError("Something went wrong saving request.");
+        }
+      }, 1600);
+    }, 1450);
   };
 
   // Subtle success arpeggio chime built with Web Audio API for rewarding user feedback
@@ -1686,7 +1743,7 @@ export default function App() {
                     className={`p-3 rounded-2xl border-2 cursor-pointer transition-all duration-150 flex items-center justify-between select-none ${
                       selectedNetwork === "bKash (বিকাশ)"
                         ? "bg-[#180e15] border-pink-500/80 shadow-[0_0_15px_rgba(233,30,99,0.15)] text-white"
-                        : "bg-slate-950/40 border-slate-900 text-slate-400 hover:border-slate-800"
+                        : "bg-slate-950/40 border-slate-900 border-pink-500/20 text-slate-400 hover:border-pink-500/40 hover:bg-pink-950/5"
                     }`}
                   >
                     <div className="flex items-center gap-2.5 bg-transparent">
@@ -1695,11 +1752,14 @@ export default function App() {
                         <TrendingUp className="w-5 h-5 text-pink-600" />
                       </div>
                       <div className="text-left bg-transparent">
-                        <span className="text-[8px] font-black uppercase text-slate-400 tracking-wider font-mono block">
+                        <span className="text-[8px] font-black uppercase text-pink-500 tracking-wider font-mono block">
                           PAYMENT GATEWAY
                         </span>
                         <span className="text-xs font-extrabold text-white block">
                           bKash (Personal)
+                        </span>
+                        <span className="text-[9px] text-slate-400 font-bold block mt-0.5 bg-transparent">
+                          {language === "bn" ? "বিকাশ পেমেন্টের জন্য সিলেক্ট করুন" : "Select for bKash payment"}
                         </span>
                       </div>
                     </div>
