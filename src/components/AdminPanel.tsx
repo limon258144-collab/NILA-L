@@ -45,7 +45,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
   const [globalAnnouncement, setGlobalAnnouncement] = useState("যেকোনো প্রয়োজনে নিচে দেওয়া টেলিগ্রাম লিংকে মেসেজ করুন");
   const [adminUsdt, setAdminUsdt] = useState("TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x");
   const [adminTrx, setAdminTrx] = useState("TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x");
-  const [adminLtc, setAdminLtc] = useState("01700000000");
+  const [adminLtc, setAdminLtc] = useState("01568760651");
   const [adminBkashInst, setAdminBkashInst] = useState("* এই বিকাশ পার্সোনাল নাম্বারে সমপরিমাণ টাকা Send Money করুন।");
   const [adminCryptoInst, setAdminCryptoInst] = useState("* Send exactly the payment amount to this receiver wallet.");
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -88,7 +88,12 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
       if (storedTrx) setAdminTrx(storedTrx);
 
       const storedLtc = localStorage.getItem("nila_custom_ltc_v1");
-      if (storedLtc) setAdminLtc(storedLtc);
+      if (storedLtc && storedLtc !== "01700000000") {
+        setAdminLtc(storedLtc);
+      } else {
+        setAdminLtc("01568760651");
+        localStorage.setItem("nila_custom_ltc_v1", "01568760651");
+      }
 
       const storedBkashInst = localStorage.getItem("nila_custom_bkash_inst_v1");
       if (storedBkashInst) setAdminBkashInst(storedBkashInst);

@@ -53,7 +53,7 @@ export default function App() {
   const [showPaymentGateway, setShowPaymentGateway] = useState(false);
   const [walletUSDT, setWalletUSDT] = useState("TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x");
   const [walletTRX, setWalletTRX] = useState("TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x");
-  const [walletLTC, setWalletLTC] = useState("01700000000");
+  const [walletLTC, setWalletLTC] = useState("01568760651");
   const [bkashInstruction, setBkashInstruction] = useState("* এই বিকাশ পার্সোনাল নাম্বারে সমপরিমাণ টাকা Send Money করুন।");
   const [cryptoInstruction, setCryptoInstruction] = useState("* Send exactly the payment amount to this receiver wallet.");
 
@@ -92,7 +92,12 @@ export default function App() {
       if (storedTrx) setWalletTRX(storedTrx);
 
       const storedLtc = localStorage.getItem("nila_custom_ltc_v1");
-      if (storedLtc) setWalletLTC(storedLtc);
+      if (storedLtc && storedLtc !== "01700000000") {
+        setWalletLTC(storedLtc);
+      } else {
+        setWalletLTC("01568760651");
+        localStorage.setItem("nila_custom_ltc_v1", "01568760651");
+      }
       
       const storedBkashInst = localStorage.getItem("nila_custom_bkash_inst_v1");
       if (storedBkashInst) setBkashInstruction(storedBkashInst);
