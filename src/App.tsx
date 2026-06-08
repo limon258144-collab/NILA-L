@@ -843,14 +843,7 @@ export default function App() {
             NILA\L
           </div>
           
-          <div className="flex items-center gap-1.5">
-            <Signal className="w-3.5 h-3.5 text-emerald-400" />
-            <Wifi className="w-3.5 h-3.5 text-indigo-400" />
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] font-mono">{mockBattery}%</span>
-              <Battery className="w-4 h-4 text-emerald-400" />
-            </div>
-          </div>
+          <div className="w-[45px]" />
         </div>
 
         {/* Dynamic Compact Interactive Main Header */}
@@ -1007,12 +1000,19 @@ export default function App() {
                       }`}
                       title="Activate VIP Premium"
                     >
-                      <div className="flex items-center gap-2">
-                        <Sparkles className={`w-3.5 h-3.5 ${limitInfo.remaining === 0 ? "text-rose-450" : "text-indigo-400 animate-pulse"}`} />
-                        <span className="font-semibold select-none">
+                      <div className="flex flex-col text-left">
+                        <div className="flex items-center gap-2">
+                          <Sparkles className={`w-3.5 h-3.5 ${limitInfo.remaining === 0 ? "text-rose-450" : "text-indigo-400 animate-pulse"}`} />
+                          <span className="font-semibold select-none text-[11px] sm:text-xs">
+                            {language === "bn"
+                              ? "অ্যানালাইসিস দৈনিক লিমিট:"
+                              : "Daily Analysis Limit:"}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-indigo-400 font-bold select-none block mt-0.5">
                           {language === "bn"
-                            ? "অ্যানালাইসিস দৈনিক লিমিট:"
-                            : "Daily Analysis Limit:"}
+                            ? "এখানে ট্যাপ করে প্রো ফিচার কিনুন"
+                            : "Click here to buy PRO features"}
                         </span>
                       </div>
                       <div className="font-mono font-bold text-right text-[11px]">
@@ -1181,7 +1181,7 @@ export default function App() {
                       কোনো ট্রেডিং চার্ট ফাইল নেই
                     </h3>
                     <p className="text-xs text-slate-400 leading-relaxed font-semibold">
-                      আপনার কিউএল, পকেট অপশন বা ট্রেডিংভিউ চার্টের স্ক্রিনশট নিচে আপলোড করুন। আমাদের এআই অ্যানালাইজার তৎক্ষণাৎ পরবর্তী ক্যান্ডেলের পূর্বাভাস নির্ধারণ করে দেবে।
+                      আপনার কিউএল, পকেট অপশন বা ট্রেডিংভিউ চার্টের স্ক্রিনশট নিচে আপলোড করুন। পরবর্তী ক্যান্ডেলের জন্য এন্ট্রি দাও, তার আগে না!
                     </p>
                   </div>
 
@@ -1618,8 +1618,8 @@ export default function App() {
                       </div>
                     </div>
                     
-                    <span className="text-[10px] font-black text-rose-500 uppercase tracking-wider select-none pr-1">
-                      No bKash
+                    <span className="text-[11px] font-bold text-[#e11d48] bg-pink-500/10 px-2.5 py-1 rounded-xl tracking-wide select-none font-mono">
+                      {walletLTC || (language === "bn" ? "প্রবেশ করাননি" : "Not Set")}
                     </span>
                   </div>
 
