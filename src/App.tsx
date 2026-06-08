@@ -20,6 +20,7 @@ import {
   ShieldCheck,
   Megaphone,
   Check,
+  Edit2,
 } from "lucide-react";
 import { AnalysisHistoryItem, TradingAnalysis } from "./types";
 import { translations, Language } from "./utils/translations";
@@ -66,6 +67,10 @@ export default function App() {
   const [payError, setPayError] = useState<string | null>(null);
   const [paySuccess, setPaySuccess] = useState<string | null>(null);
   const [walletCopied, setWalletCopied] = useState<boolean>(false);
+  
+  // bKash quick-edit inline support
+  const [isEditingBkash, setIsEditingBkash] = useState(false);
+  const [tempBkashNumber, setTempBkashNumber] = useState("");
 
   // Core activeItem state referenced by the alert effects block
   const [activeItem, setActiveItem] = useState<AnalysisHistoryItem | null>(null);
@@ -1709,12 +1714,21 @@ export default function App() {
                         )}
                       </div>
                       
-                      <div 
-                        onClick={handleCopyWalletAddress}
-                        className="w-full bg-slate-950/90 border border-slate-850 hover:border-slate-800 rounded-xl py-2 px-3 text-[10px] text-slate-300 font-mono select-all break-all cursor-pointer leading-relaxed text-center hover:text-sky-400 transition"
-                      >
-                        {getSelectedWalletAddress()}
-                      </div>
+                      {selectedNetwork === "bKash (বিকাশ)" ? (
+                        <div 
+                          onClick={handleCopyWalletAddress}
+                          className="w-full bg-slate-950/90 border border-pink-500/20 hover:border-pink-500/50 rounded-xl py-2 px-3 text-[11px] text-pink-400 font-mono font-extrabold select-all cursor-pointer leading-relaxed text-center hover:scale-[1.01] transition shadow-[0_0_10px_rgba(233,30,99,0.03)]"
+                        >
+                          {getSelectedWalletAddress() || "017XXXXXXXX"}
+                        </div>
+                      ) : (
+                        <div 
+                          onClick={handleCopyWalletAddress}
+                          className="w-full bg-slate-950/90 border border-slate-850 hover:border-slate-800 rounded-xl py-2 px-3 text-[10px] text-slate-300 font-mono select-all break-all cursor-pointer leading-relaxed text-center hover:text-sky-400 transition"
+                        >
+                          {getSelectedWalletAddress()}
+                        </div>
+                      )}
                       <p className="text-[9px] text-slate-500 mt-1 font-mono leading-none italic text-center bg-transparent">
                         {selectedNetwork === "bKash (বিকাশ)" ? bkashInstruction : cryptoInstruction}
                       </p>
