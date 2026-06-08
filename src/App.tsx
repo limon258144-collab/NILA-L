@@ -277,10 +277,50 @@ export default function App() {
     if (isUserAdmin(username)) return true;
     try {
       const proUsersStr = localStorage.getItem("nila_pro_users_v1") || "[]";
-      const proUsers: string[] = JSON.parse(proUsersStr);
-      return proUsers.includes(username.toLowerCase());
+      const proUsers: any[] = JSON.parse(proUsersStr);
+      return proUsers.some((entry: any) => {
+        if (typeof entry === "string") {
+          return entry.toLowerCase() === username.toLowerCase();
+        } else if (entry && typeof entry === "object" && entry.username) {
+          if (entry.username.toLowerCase() === username.toLowerCase()) {
+            if (entry.expiresAt && entry.expiresAt < Date.now()) {
+              return false;
+            }
+            return true;
+          }
+        }
+        return false;
+      });
     } catch (e) {
       return false;
+    }
+  };
+
+  const getProDaysRemaining = (username: string | null): number | null => {
+    if (!username) return null;
+    try {
+      const proUsersStr = localStorage.getItem("nila_pro_users_v1") || "[]";
+      const proUsers: any[] = JSON.parse(proUsersStr);
+      const entry = proUsers.find((e: any) => {
+        if (typeof e === "string") {
+          return e.toLowerCase() === username.toLowerCase();
+        } else if (e && typeof e === "object" && e.username) {
+          return e.username.toLowerCase() === username.toLowerCase();
+        }
+        return false;
+      });
+      if (!entry) return null;
+      if (typeof entry === "string") {
+        return 30; // default for manual additions
+      }
+      if (entry && entry.expiresAt) {
+        const msLeft = entry.expiresAt - Date.now();
+        const daysLeft = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
+        return Math.max(0, daysLeft);
+      }
+      return null;
+    } catch (e) {
+      return null;
     }
   };
 
@@ -999,43 +1039,79 @@ export default function App() {
               {/* Daily Analysis limit banner */}
               {currentUser && !isUserAdmin(currentUser) && (
                 (() => {
+                  const isPro = checkUserProStatus(currentUser);
                   const limitInfo = checkAnalysisLimit(currentUser);
                   return (
-                    <div 
-                      onClick={() => setShowPaymentGateway(true)}
-                      className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs transition duration-150 cursor-pointer active:scale-[0.98] select-none hover:brightness-110 ${
-                        limitInfo.remaining === 0 
-                          ? "bg-rose-950/25 border-rose-500/40 text-rose-350 animate-bounce" 
-                          : "bg-indigo-950/20 border-indigo-500/15 text-indigo-300 hover:border-indigo-500/30"
-                      }`}
-                      title="Activate VIP Premium"
-                    >
-                      <div className="flex flex-col text-left">
-                        <div className="flex items-center gap-2">
-                          <Sparkles className={`w-3.5 h-3.5 ${limitInfo.remaining === 0 ? "text-rose-450" : "text-indigo-400 animate-pulse"}`} />
-                          <span className="font-semibold select-none text-[11px] sm:text-xs">
-                            {language === "bn"
-                              ? "অ্যানালাইসিস দৈনিক লিমিট:"
-                              : "Daily Analysis Limit:"}
-                          </span>
+                    <div>
+                      {isPro ? (
+                        <div 
+                          className="p-3.5 rounded-2xl border bg-emerald-950/20 border-emerald-500/20 text-emerald-300 select-none hover:border-emerald-500/40 transition duration-155"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-col text-left">
+                              <div className="flex items-center gap-2 bg-transparent">
+                                <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                                <span className="font-extrabold select-none text-[11px] sm:text-xs">
+                                  {language === "bn"
+                                    ? "প্রো মেম্বারশিপ একটিভ আছে"
+                                    : "PRO Membership Active"}
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-slate-400 font-bold select-none block mt-0.5">
+                                {language === "bn"
+                                  ? "আপনি আনলিমিটেড অ্যানালাইসিস সুবিধা পাচ্ছেন"
+                                  : "You have unlimited analysis access"}
+                              </span>
+                            </div>
+                            <div className="font-mono font-bold text-right text-xs bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-xl border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]">
+                              {(() => {
+                                const days = getProDaysRemaining(currentUser);
+                                if (days !== null) {
+                                  return language === "bn" ? `${days} দিন বাকি` : `${days} days left`;
+                                }
+                                return language === "bn" ? "আজীবন" : "Lifetime";
+                              })()}
+                            </div>
+                          </div>
                         </div>
-                        <span className="text-[10px] text-indigo-400 font-bold select-none block mt-0.5">
-                          {language === "bn"
-                            ? "এখানে ট্যাপ করে প্রো ফিচার কিনুন"
-                            : "Click here to buy PRO features"}
-                        </span>
-                      </div>
-                      <div className="font-mono font-bold text-right text-[11px]">
-                        {limitInfo.remaining === 0 ? (
-                          <span className="text-emerald-400 text-xs sm:text-[13.5px] font-black animate-pulse uppercase tracking-wider block">
-                            pro feucher active karo
-                          </span>
-                        ) : (
-                          language === "bn"
-                            ? `${limitInfo.remaining} টি বাকি (২ টির মধ্যে)`
-                            : `${limitInfo.remaining} remaining (out of 2)`
-                        )}
-                      </div>
+                      ) : (
+                        <div 
+                          onClick={() => setShowPaymentGateway(true)}
+                          className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs transition duration-150 cursor-pointer active:scale-[0.98] select-none hover:brightness-110 ${
+                            limitInfo.remaining === 0 
+                              ? "bg-rose-950/25 border-rose-500/40 text-rose-350 animate-bounce" 
+                              : "bg-indigo-950/20 border-indigo-500/15 text-indigo-300 hover:border-indigo-500/30"
+                          }`}
+                          title="Activate VIP Premium"
+                        >
+                          <div className="flex flex-col text-left">
+                            <div className="flex items-center gap-2">
+                              <Sparkles className={`w-3.5 h-3.5 ${limitInfo.remaining === 0 ? "text-rose-450" : "text-indigo-400 animate-pulse"}`} />
+                              <span className="font-semibold select-none text-[11px] sm:text-xs">
+                                {language === "bn"
+                                  ? "অ্যানালাইসিস দৈনিক লিমিট:"
+                                  : "Daily Analysis Limit:"}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-indigo-400 font-bold select-none block mt-0.5">
+                              {language === "bn"
+                                ? "এখানে ট্যাপ করে প্রো ফিচার কিনুন"
+                                : "Click here to buy PRO features"}
+                            </span>
+                          </div>
+                          <div className="font-mono font-bold text-right text-[11px]">
+                            {limitInfo.remaining === 0 ? (
+                              <span className="text-emerald-400 text-xs sm:text-[13.5px] font-black animate-pulse uppercase tracking-wider block">
+                                pro feucher active karo
+                              </span>
+                            ) : (
+                              language === "bn"
+                                ? `${limitInfo.remaining} টি বাকি (২ টির মধ্যে)`
+                                : `${limitInfo.remaining} remaining (out of 2)`
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })()

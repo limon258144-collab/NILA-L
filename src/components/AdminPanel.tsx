@@ -218,11 +218,29 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
       setSubmittedPayments(updatedPayments);
 
       const proUsersStr = localStorage.getItem("nila_pro_users_v1") || "[]";
-      const proUsers: string[] = JSON.parse(proUsersStr);
-      if (!proUsers.includes(payment.username.toLowerCase())) {
-        proUsers.push(payment.username.toLowerCase());
-      }
-      localStorage.setItem("nila_pro_users_v1", JSON.stringify(proUsers));
+      const proUsers: any[] = JSON.parse(proUsersStr);
+      
+      // Calculate 30 days from now
+      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+      const expiresAt = Date.now() + thirtyDaysMs;
+
+      // Filter out any previous entries for this username
+      const filteredProUsers = proUsers.filter((entry: any) => {
+        if (typeof entry === "string") {
+          return entry.toLowerCase() !== payment.username.toLowerCase();
+        } else if (entry && typeof entry === "object" && entry.username) {
+          return entry.username.toLowerCase() !== payment.username.toLowerCase();
+        }
+        return true;
+      });
+
+      // Add the user with expiry data
+      filteredProUsers.push({
+        username: payment.username.toLowerCase(),
+        expiresAt: expiresAt
+      });
+
+      localStorage.setItem("nila_pro_users_v1", JSON.stringify(filteredProUsers));
 
       window.dispatchEvent(new Event("nila_settings_updated"));
     } catch (e) {
@@ -244,9 +262,16 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
       setSubmittedPayments(updatedPayments);
 
       const proUsersStr = localStorage.getItem("nila_pro_users_v1") || "[]";
-      let proUsers: string[] = JSON.parse(proUsersStr);
-      proUsers = proUsers.filter(un => un !== payment.username.toLowerCase());
-      localStorage.setItem("nila_pro_users_v1", JSON.stringify(proUsers));
+      const proUsers: any[] = JSON.parse(proUsersStr);
+      const updatedProUsers = proUsers.filter((entry: any) => {
+        if (typeof entry === "string") {
+          return entry.toLowerCase() !== payment.username.toLowerCase();
+        } else if (entry && typeof entry === "object" && entry.username) {
+          return entry.username.toLowerCase() !== payment.username.toLowerCase();
+        }
+        return true;
+      });
+      localStorage.setItem("nila_pro_users_v1", JSON.stringify(updatedProUsers));
 
       window.dispatchEvent(new Event("nila_settings_updated"));
     } catch (e) {
