@@ -16,6 +16,43 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
   const [pasteText, setPasteText] = useState("");
   const [pasteError, setPasteError] = useState<string | null>(null);
 
+  // Client-side image resize and compression helper to reduce base64 footprint (extremely fast)
+  const compressAndResizeImage = (dataUrl: string, callback: (compressed: string) => void) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxDimension = 1280;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        // Convert to high-performance JPEG format with 0.82 quality
+        const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.82);
+        callback(compressedDataUrl);
+      } else {
+        callback(dataUrl);
+      }
+    };
+    img.onerror = () => {
+      callback(dataUrl);
+    };
+    img.src = dataUrl;
+  };
+
   const processFile = (file: File) => {
     if (!file.type.startsWith("image/")) {
       alert("অনুগ্রহ করে একটি সঠিক ছবি (PNG, JPG, JPEG) আপলোড করুন।");
@@ -24,7 +61,9 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
     const reader = new FileReader();
     reader.onload = (e) => {
       if (e.target?.result && typeof e.target.result === "string") {
-        onImageSelected(e.target.result, file.name);
+        compressAndResizeImage(e.target.result, (compressedData) => {
+          onImageSelected(compressedData, file.name);
+        });
       }
     };
     reader.readAsDataURL(file);
@@ -72,9 +111,11 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
             const reader = new FileReader();
             reader.onload = (event) => {
               if (event.target?.result && typeof event.target.result === "string") {
-                onImageSelected(event.target.result, "clipboard-pasted-chart.png");
-                setPasteError(null);
-                setPasteText("");
+                compressAndResizeImage(event.target.result, (compressedData) => {
+                  onImageSelected(compressedData, "clipboard-pasted-chart.png");
+                  setPasteError(null);
+                  setPasteText("");
+                });
               }
             };
             reader.readAsDataURL(blob);
@@ -93,9 +134,11 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
 
     const trimmed = value.trim();
     if (trimmed.startsWith("data:image/") && trimmed.includes(";base64,")) {
-      onImageSelected(trimmed, "base64-instant-load.png");
-      setPasteText("");
-      setPasteError(null);
+      compressAndResizeImage(trimmed, (compressedData) => {
+        onImageSelected(compressedData, "base64-instant-load.png");
+        setPasteText("");
+        setPasteError(null);
+      });
     }
   };
 
@@ -104,9 +147,11 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
     if (!trimmed) return;
 
     if (trimmed.startsWith("data:image/")) {
-      onImageSelected(trimmed, "base64-pasted-chart.png");
-      setPasteText("");
-      setPasteError(null);
+      compressAndResizeImage(trimmed, (compressedData) => {
+        onImageSelected(compressedData, "base64-pasted-chart.png");
+        setPasteText("");
+        setPasteError(null);
+      });
     } else if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
       onImageSelected(trimmed, "url-pasted-chart.png");
       setPasteText("");

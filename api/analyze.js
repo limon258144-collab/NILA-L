@@ -78,7 +78,7 @@ export default async function handler(req, res) {
     `;
 
     // Progressive model fallback list to ensure robustness against high demand / free plan quotas
-    const candidateModels = ["gemini-2.5-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite"];
+    const candidateModels = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash"];
     let response = null;
     let lastModelError = null;
 

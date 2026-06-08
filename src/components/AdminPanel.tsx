@@ -14,7 +14,8 @@ import {
   AlertCircle,
   TrendingUp,
   RefreshCw,
-  HelpCircle
+  HelpCircle,
+  X
 } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -42,7 +43,13 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
   const [adminOwner2, setAdminOwner2] = useState("korim debolopar");
   const [adminWinRate, setAdminWinRate] = useState("98%");
   const [globalAnnouncement, setGlobalAnnouncement] = useState("যেকোনো প্রয়োজনে নিচে দেওয়া টেলিগ্রাম লিংকে মেসেজ করুন");
+  const [adminUsdt, setAdminUsdt] = useState("TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x");
+  const [adminTrx, setAdminTrx] = useState("TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x");
+  const [adminLtc, setAdminLtc] = useState("01700000000");
+  const [adminBkashInst, setAdminBkashInst] = useState("* এই বিকাশ পার্সোনাল নাম্বারে সমপরিমাণ টাকা Send Money করুন।");
+  const [adminCryptoInst, setAdminCryptoInst] = useState("* Send exactly the payment amount to this receiver wallet.");
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [submittedPayments, setSubmittedPayments] = useState<any[]>([]);
 
   // Load registered users and editable variables
   const loadUsersAndStats = () => {
@@ -73,6 +80,28 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
 
       const storedAnnounce = localStorage.getItem("nila_custom_announcement_v1");
       if (storedAnnounce) setGlobalAnnouncement(storedAnnounce);
+
+      const storedUsdt = localStorage.getItem("nila_custom_usdt_v1");
+      if (storedUsdt) setAdminUsdt(storedUsdt);
+
+      const storedTrx = localStorage.getItem("nila_custom_trx_v1");
+      if (storedTrx) setAdminTrx(storedTrx);
+
+      const storedLtc = localStorage.getItem("nila_custom_ltc_v1");
+      if (storedLtc) setAdminLtc(storedLtc);
+
+      const storedBkashInst = localStorage.getItem("nila_custom_bkash_inst_v1");
+      if (storedBkashInst) setAdminBkashInst(storedBkashInst);
+
+      const storedCryptoInst = localStorage.getItem("nila_custom_crypto_inst_v1");
+      if (storedCryptoInst) setAdminCryptoInst(storedCryptoInst);
+
+      try {
+        const storedPayments = localStorage.getItem("nila_submitted_payments_v1") || "[]";
+        setSubmittedPayments(JSON.parse(storedPayments));
+      } catch (err) {
+        setSubmittedPayments([]);
+      }
 
       // 3. Load active sessions
       const storedSessions = localStorage.getItem("nila_active_sessions_v1");
@@ -114,6 +143,11 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
       localStorage.setItem("nila_custom_owner2_v1", adminOwner2);
       localStorage.setItem("nila_custom_winrate_v1", adminWinRate);
       localStorage.setItem("nila_custom_announcement_v1", globalAnnouncement);
+      localStorage.setItem("nila_custom_usdt_v1", adminUsdt);
+      localStorage.setItem("nila_custom_trx_v1", adminTrx);
+      localStorage.setItem("nila_custom_ltc_v1", adminLtc);
+      localStorage.setItem("nila_custom_bkash_inst_v1", adminBkashInst);
+      localStorage.setItem("nila_custom_crypto_inst_v1", adminCryptoInst);
       
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
@@ -163,6 +197,69 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
       return;
     }
     setUserToDelete(usernameToDelete);
+  };
+
+  const handleApprovePayment = (payment: any) => {
+    try {
+      const storedPayments = localStorage.getItem("nila_submitted_payments_v1") || "[]";
+      const payments = JSON.parse(storedPayments);
+      const updatedPayments = payments.map((p: any) => {
+        if (p.id === payment.id) {
+          return { ...p, status: "approved" };
+        }
+        return p;
+      });
+      localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(updatedPayments));
+      setSubmittedPayments(updatedPayments);
+
+      const proUsersStr = localStorage.getItem("nila_pro_users_v1") || "[]";
+      const proUsers: string[] = JSON.parse(proUsersStr);
+      if (!proUsers.includes(payment.username.toLowerCase())) {
+        proUsers.push(payment.username.toLowerCase());
+      }
+      localStorage.setItem("nila_pro_users_v1", JSON.stringify(proUsers));
+
+      window.dispatchEvent(new Event("nila_settings_updated"));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleRejectPayment = (payment: any) => {
+    try {
+      const storedPayments = localStorage.getItem("nila_submitted_payments_v1") || "[]";
+      const payments = JSON.parse(storedPayments);
+      const updatedPayments = payments.map((p: any) => {
+        if (p.id === payment.id) {
+          return { ...p, status: "rejected" };
+        }
+        return p;
+      });
+      localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(updatedPayments));
+      setSubmittedPayments(updatedPayments);
+
+      const proUsersStr = localStorage.getItem("nila_pro_users_v1") || "[]";
+      let proUsers: string[] = JSON.parse(proUsersStr);
+      proUsers = proUsers.filter(un => un !== payment.username.toLowerCase());
+      localStorage.setItem("nila_pro_users_v1", JSON.stringify(proUsers));
+
+      window.dispatchEvent(new Event("nila_settings_updated"));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteSubmittedPayment = (paymentId: string) => {
+    try {
+      const storedPayments = localStorage.getItem("nila_submitted_payments_v1") || "[]";
+      const payments = JSON.parse(storedPayments);
+      const updated = payments.filter((p: any) => p.id !== paymentId);
+      localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(updated));
+      setSubmittedPayments(updated);
+      window.dispatchEvent(new Event("nila_settings_updated"));
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   // Filter list of users
@@ -372,6 +469,104 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
             </div>
           </div>
 
+          <div className="space-y-4 border-t border-slate-805/45 pt-3.5 mt-2">
+            <h4 className="text-white text-[11px] font-black uppercase tracking-widest text-[#00e676] flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00e676] animate-ping" />
+              পেমেন্ট বক্স টেক্সট ও নাম্বার ড্যাশবোর্ড
+            </h4>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[9.5px] font-mono font-bold text-slate-300 uppercase tracking-widest block">
+                  bKash (বিকাশ) Personal Number
+                </label>
+                <input
+                  type="text"
+                  value={adminLtc}
+                  onChange={(e) => setAdminLtc(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-805 focus:border-indigo-500/40 text-slate-100 text-xs rounded-xl py-2 px-3 focus:outline-none font-mono font-bold text-purple-400"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9.5px] font-mono font-bold text-slate-300 uppercase tracking-widest block">
+                  bKash (বিকাশ) Instruction Text
+                </label>
+                <input
+                  type="text"
+                  value={adminBkashInst}
+                  onChange={(e) => setAdminBkashInst(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-805 focus:border-indigo-500/40 text-slate-100 text-xs rounded-xl py-2 px-3 focus:outline-none placeholder:text-slate-650"
+                  placeholder="বিকাশ বক্সের নিচের ছোট লেখা..."
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[9.5px] font-mono font-bold text-slate-300 uppercase tracking-widest block">
+                USDT (TRC-20) Wallet Address
+              </label>
+              <input
+                type="text"
+                value={adminUsdt}
+                onChange={(e) => setAdminUsdt(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-805 hover:border-slate-800 transition duration-150 focus:border-pink-500/40 text-slate-100 text-xs rounded-xl py-2 px-3 focus:outline-none font-mono"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[9.5px] font-mono font-bold text-slate-300 uppercase tracking-widest block">
+                  TRX (TRC-20) Address
+                </label>
+                <input
+                  type="text"
+                  value={adminTrx}
+                  onChange={(e) => setAdminTrx(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-805 focus:border-indigo-500/40 text-slate-100 text-xs rounded-xl py-2 px-3 focus:outline-none font-mono"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9.5px] font-mono font-bold text-slate-300 uppercase tracking-widest block">
+                  Crypto Instruction Text
+                </label>
+                <input
+                  type="text"
+                  value={adminCryptoInst}
+                  onChange={(e) => setAdminCryptoInst(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-805 focus:border-indigo-500/40 text-slate-100 text-xs rounded-xl py-2 px-3 focus:outline-none placeholder:text-slate-650"
+                  placeholder="ক্রিপ্টো বক্সের নিচের ছোট লেখা..."
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Live Preview Section inside Admin Panel for instantly checking design */}
+            <div className="mt-2.5 p-3.5 rounded-2xl bg-[#0d0f19] border border-indigo-500/10 text-center space-y-2.5 shadow-inner">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold text-indigo-400 font-mono tracking-widest uppercase flex items-center gap-1 bg-transparent">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500/60" />
+                  পেমেন্ট বক্স লাইভ প্রিভিউ (বিকাশ ভিউ)
+                </span>
+                <span className="text-[8px] font-bold text-slate-500 font-mono bg-slate-950 px-1.5 py-0.5 rounded border border-slate-900">
+                  REAL-TIME PREVIEW
+                </span>
+              </div>
+              
+              <div className="bg-[#111116] border border-slate-850 hover:border-slate-800 rounded-xl py-2 px-3 text-[10px] text-slate-300 font-mono select-all break-all cursor-pointer leading-relaxed text-center hover:text-sky-400 transition font-bold shadow-md">
+                {adminLtc || "017XXXXXXXX"}
+              </div>
+              <p className="text-[9px] text-slate-500 mt-1 font-mono leading-relaxed italic block text-center bg-transparent">
+                {adminBkashInst}
+              </p>
+            </div>
+          </div>
+
           <button
             type="submit"
             className="w-full bg-gradient-to-r from-pink-650 to-indigo-650 hover:from-pink-600 hover:to-indigo-600 text-white font-extrabold text-xs py-3 rounded-xl transition duration-155 active:scale-95 cursor-pointer mt-1"
@@ -379,6 +574,103 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
             {language === "bn" ? "ডাইনামিক কনফিগারেশন সেভ করুন" : "Save Changes"}
           </button>
         </form>
+      </div>
+
+      {/* Submitted Payments list box */}
+      <div id="payment-verification-queue" className="bg-[#111116] border border-indigo-500/15 rounded-3xl p-5 space-y-3.5 shadow-xl">
+        <div className="flex flex-col gap-1.5 pb-2.5 border-b border-slate-805 sm:flex-row sm:items-center sm:justify-between">
+          <h3 className="text-white text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
+            <Radio className="w-4 h-4 text-pink-400 shrink-0" />
+            <span>কনফার্মেশন পেমেন্ট লিস্ট (Verification Queue)</span>
+          </h3>
+          <span className="text-[9px] font-mono text-slate-400 font-bold bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 max-w-max">
+            {submittedPayments.length} Submitted Tx
+          </span>
+        </div>
+
+        <div className="max-h-[250px] overflow-y-auto custom-scrollbar space-y-2.5 pr-0.5">
+          {submittedPayments.length === 0 ? (
+            <p className="text-xs text-slate-500 text-center py-8 font-semibold italic">
+              কোনো নতুন পেমেন্ট রিকোয়েস্ট জমা পরেনি।
+            </p>
+          ) : (
+            [...submittedPayments].reverse().map((payment: any, index: number) => {
+              return (
+                <div 
+                  key={payment.id || index}
+                  className="p-3 rounded-2xl bg-slate-950/75 border border-slate-850 hover:border-slate-800 space-y-2 text-xs text-left"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-extrabold text-white text-xs font-mono">{payment.username}</span>
+                        <span className="text-[8px] bg-slate-800 text-amber-300 font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                          {payment.network}
+                        </span>
+                      </div>
+                      <span className="text-[9px] text-slate-500 font-mono">
+                        {new Date(payment.timestamp).toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div>
+                      {payment.status === "pending" ? (
+                        <span className="text-[9px] px-2 py-0.5 bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 font-black rounded-full uppercase tracking-wider animate-pulse">
+                          Pending
+                        </span>
+                      ) : payment.status === "approved" ? (
+                        <span className="text-[9px] px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-black rounded-full uppercase tracking-wider">
+                          Approved
+                        </span>
+                      ) : (
+                        <span className="text-[9px] px-2 py-0.5 bg-rose-500/10 text-rose-450 border border-rose-500/20 font-black rounded-full uppercase tracking-wider">
+                          Rejected
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 bg-slate-905 p-2 rounded-xl text-[11px] font-mono text-slate-350">
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">Amount Paid</span>
+                      <span className="font-extrabold text-[#00e676]">${payment.amount}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] block">Tx Hash / ID</span>
+                      <span className="font-bold text-slate-300 select-all break-all">{payment.transactionId}</span>
+                    </div>
+                  </div>
+
+                  {payment.status === "pending" && (
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => handleApprovePayment(payment)}
+                        className="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-550 text-white font-black text-[10px] rounded-lg transition duration-150 active:scale-95 cursor-pointer flex items-center justify-center gap-1"
+                      >
+                        <Check className="w-3 h-3" /> Approve & Enable PRO
+                      </button>
+                      <button
+                        onClick={() => handleRejectPayment(payment)}
+                        className="flex-1 py-1.5 px-3 bg-rose-650 hover:bg-rose-600 text-white font-black text-[10px] rounded-lg transition duration-150 active:scale-95 cursor-pointer flex items-center justify-center gap-1"
+                      >
+                        <X className="w-3 h-3" /> Reject
+                      </button>
+                    </div>
+                  )}
+
+                  {payment.status !== "pending" && (
+                    <button
+                      onClick={() => handleDeleteSubmittedPayment(payment.id)}
+                      className="w-full text-center text-slate-500 hover:text-rose-400 text-[10px] font-bold py-1 bg-slate-900/40 hover:bg-rose-950/20 rounded-lg transition cursor-pointer"
+                    >
+                      Delete Log Record
+                    </button>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
 
       {/* Registered Users List Controller box */}
