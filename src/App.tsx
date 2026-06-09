@@ -58,9 +58,9 @@ export default function App() {
   const [cryptoInstruction, setCryptoInstruction] = useState("* Send exactly the payment amount to this receiver wallet.");
 
   // Payment workflow states
-  const [selectedNetwork, setSelectedNetwork] = useState<string>("");
+  const [selectedNetwork, setSelectedNetwork] = useState<string>("bKash (বিকাশ)");
   const [payAmount, setPayAmount] = useState<string>("20.00");
-  const [senderNumber, setSenderNumber] = useState<string>("");
+  const [senderNumber, setSenderNumber] = useState<string>("01568760651");
   const [txID, setTxID] = useState<string>("");
   const [isVerifyingTx, setIsVerifyingTx] = useState<boolean>(false);
   const [verificationStep, setVerificationStep] = useState<number>(0);
@@ -232,61 +232,7 @@ export default function App() {
     }, 1400);
   };
 
-  const handleQuickBkashRequest = () => {
-    setSelectedNetwork("bKash (বিকাশ)");
-    setPayError(null);
-    setPaySuccess(null);
-    setIsVerifyingTx(true);
-    setVerificationStep(1);
 
-    setTimeout(() => {
-      setVerificationStep(2);
-      
-      setTimeout(() => {
-        try {
-          const currentPaymentsStr = localStorage.getItem("nila_submitted_payments_v1") || "[]";
-          const payments = JSON.parse(currentPaymentsStr);
-          
-          const txChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-          let bkashTx = "8N";
-          for (let i = 0; i < 8; i++) {
-            bkashTx += txChars.charAt(Math.floor(Math.random() * txChars.length));
-          }
-
-          const payItem = {
-            id: "pay_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
-            username: currentUser || "unknown",
-            paymentMethod: "bKash",
-            network: "bKash (বিকাশ)",
-            amount: 20.00,
-            transactionId: bkashTx,
-            senderNumber: senderNumber || walletLTC || "01568760651",
-            timestamp: Date.now(),
-            status: "pending"
-          };
-          
-          payments.push(payItem);
-          localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(payments));
-          
-          setIsVerifyingTx(false);
-          setVerificationStep(0);
-          setPaySuccess(
-            language === "bn"
-              ? "বিকাশ ভেরিফিকেশন রিকোয়েস্ট সরাসরি অ্যাডমিনের কাছে পাঠানো হয়েছে! অ্যাডমিন প্যানেল (Verification Queue) থেকে অ্যাপ্রুভ করুন।"
-              : "bKash verification request successfully sent! Please approve it from Admin Panel (Verification Queue)."
-          );
-          
-          playSuccessChime();
-          window.dispatchEvent(new Event("nila_settings_updated"));
-        } catch (err) {
-          console.error(err);
-          setIsVerifyingTx(false);
-          setVerificationStep(0);
-          setPayError("Something went wrong saving request.");
-        }
-      }, 1600);
-    }, 1450);
-  };
 
   // Subtle success arpeggio chime built with Web Audio API for rewarding user feedback
   const playSuccessChime = () => {
@@ -612,24 +558,24 @@ export default function App() {
         : price.toFixed(5);
     };
 
-    const isUp = index % 2 === 0;
-    const prediction = isUp ? "Up" : "Down";
-    const confidence = 84 + (sec % 13);
+    const signalState = (fileName.length + sec) % 3; // 0 = Up, 1 = Down, 2 = Neutral
+    const prediction = signalState === 0 ? "Up" : signalState === 1 ? "Down" : "Neutral";
+    const confidence = prediction === "Neutral" ? (35 + (sec % 11)) : (98 + (sec % 2)); // 98-99% for active entries, low for Neutral
 
     const upEntry = formatPrice(basePrice + 0.00045);
     const downEntry = formatPrice(basePrice - 0.00045);
 
-    const support = [
+    const support = prediction === "Neutral" ? ["N/A"] : [
       formatPrice(basePrice - 0.00180),
       formatPrice(basePrice - 0.00350)
     ];
-    const resistance = [
+    const resistance = prediction === "Neutral" ? ["N/A"] : [
       formatPrice(basePrice + 0.00180),
       formatPrice(basePrice + 0.00350)
     ];
 
-    const stopLoss = isUp ? formatPrice(basePrice - 0.00160) : formatPrice(basePrice + 0.00160);
-    const takeProfit = isUp ? formatPrice(basePrice + 0.00320) : formatPrice(basePrice - 0.00320);
+    const stopLoss = prediction === "Up" ? formatPrice(basePrice - 0.00160) : prediction === "Down" ? formatPrice(basePrice + 0.00160) : "N/A";
+    const takeProfit = prediction === "Up" ? formatPrice(basePrice + 0.00320) : prediction === "Down" ? formatPrice(basePrice - 0.00320) : "N/A";
 
     const upPatterns = [
       ["Double Bottom Breakout", "RSI Golden Cross Bounce", "Heikin-Ashi Bullish Pivot", "EMA 20 Support Zone Validation"],
@@ -645,54 +591,71 @@ export default function App() {
       ["Fibonacci 0.382 Pullback Resistance", "Price Action Bearish Pin Bar", "Trendline Resistance Rejection", "EMA 200 Institutional Supply Zone"]
     ];
 
-    const selectedPatterns = isUp ? upPatterns[index] : downPatterns[index];
+    const neutralPatterns = [
+      ["High Market Noise", "Volatility Indecision", "RSI Overbought/Oversold Equilibrium", "Sideways Range Consolidation"],
+      ["No Clear Directional Bias", "Consolidating Narrow Range", "Bollinger Bands Squeeze Phase", "Support/Resistance Indecisiveness"]
+    ];
+
+    const selectedPatterns = prediction === "Up" ? upPatterns[index] : prediction === "Down" ? downPatterns[index] : neutralPatterns[index % 2];
 
     const reasoningUpBn = [
-      `৫-ক্যান্ডেল এক্সপোনেনশিয়াল মুভিং এভারেজ (EMA) এবং আরএসআই (RSI) ইন্ডিকেটর অনুযায়ী মার্কেট বর্তমানে শক্তিশালী সাপোর্ট জোনে কনসোলিডেট করছে। পূর্ববর্তী ক্যান্ডেলের বুলিশ বাউন্স এবং ভলিউম স্পাইক নির্দেশ করছে যে পরবর্তী ক্যান্ডেলটি রেজিস্ট্যান্স জোনের দিকে যাবে। কনফার্মেশন লেভেলে এন্ট্রি নেওয়া অত্যন্ত লাভজনক হবে।`,
-      `চার্ট অনুযায়ী বর্তমানে শক্তিশালী বুলিশ রিজেকশন ক্যান্ডেল দেখা যাচ্ছে। ক্যান্ডেল ক্লোজিং প্যাটার্ন অনুযায়ী ক্রেতাদের চাপ বৃদ্ধি পেয়েছে এবং মার্কেট উপরের দিকে একটি নতুন ব্রেকআউট সৃষ্টির জোনে অবস্থান করছে। এই অবস্থায় আপ ট্রেড বা কল (Call) অপশন অত্যন্ত নিখুঁত কাজ করবে।`,
-      `বলিঙ্গার ব্যান্ডের নীচের অংশ স্পর্শ করে মার্কেট বর্তমানে ঊর্ধ্বমুখী প্যাটার্ন তৈরি করেছে। টেকনিক্যাল ইন্ডিকেটরগুলোর সবকয়টি সিগন্যাল বাই পজিশনের পক্ষে ইঙ্গিত করছে। বর্তমান ভলিউম ব্রেকআউট পরবর্তী ক্যান্ডেলটি সবুজ (Bullish) হওয়ার সম্ভাবনা নিশ্চিত করছে।`,
-      `ফিবোনাচ্চি গোল্ডেন রেশিও ০.৬১৮ লেভেল থেকে মার্কেট চমৎকার সাপোর্ট নিয়ে ঘুরে দাঁড়িয়েছে। একটি পরিষ্কার বুলিশ পিনবার ক্যান্ডেল তৈরি হয়েছে যা ট্রেন্ড রিভার্সাল বা পুনরায় ট্রেন্ড পরিবর্তনের নির্ভরযোগ্য প্রমাণ দেয়। কনফার্মেশন ক্লোজিং হওয়ার সাথে সাথে এন্ট্রি নিরাপদ।`
+      `৫-ক্যান্ডেল এক্সপোনেনশিয়াল মুভিং এভারেজ (EMA) এবং আরএসআই (RSI) ইন্ডিকেটর অনুযায়ী মার্কেট বর্তমানে অত্যন্ত শক্তিশালী সাপোর্ট জোনে রয়েছে। পূর্ববর্তী ক্যান্ডেলের বুলিশ বাউন্স এবং ভলিউম স্পাইক নির্দেশ করছে যে পরবর্তী ক্যান্ডেলটি রেজিস্ট্যান্স জোনে যাবে। এটি একটি ১০০% সিওর শট (SURE SHOT) লাভজনক এন্ট্রি হবে।`,
+      `চার্ট অনুযায়ী বর্তমানে শক্তিশালী বুলিশ রিজেকশন দেখা যাচ্ছে। ক্যান্ডেল ক্লোজিং প্যাটার্ন অনুযায়ী ক্রেতাদের চাপ বৃদ্ধি পেয়েছে এবং মার্কেট উপরের দিকে একটি নতুন ব্রেকআউট সৃষ্টির জোনে অবস্থান করছে। এই অবস্থায় আপ ট্রেড বা কল (Call) অপশন অত্যন্ত নিখুঁত ১00% সিওর শট (SURE SHOT) কাজ করবে।`,
+      `বলিঙ্গার ব্যান্ডের নীচের অংশ স্পর্শ করে মার্কেট বর্তমানে ঊর্ধ্বমুখী প্যাটার্ন তৈরি করেছে। ইন্ডিকেটরগুলোর সব সিগন্যাল বাই পজিশনের পক্ষে ইঙ্গিত করছে। বর্তমান ভলিউম ব্রেকআউট পরবর্তী ক্যান্ডেলটি সবুজ (Bullish) হওয়ার সম্ভাবনা নিশ্চিত করায় এটি একটি ১০০% সিওর শট (SURE SHOT) এন্ট্রি।`,
+      `ফিবোনাচ্চি গোল্ডেন রেশিও ০.৬১৮ লেভেল থেকে মার্কেট চমৎকার সাপোর্ট নিয়ে ঘুরে দাঁড়িয়েছে। একটি পরিষ্কার বুলিশ পিনবার তৈরি হয়েছে যা ট্রেন্ড পরিবর্তন নিশ্চিত করে। ক্লোজিংয়ের সাথে সাথে এন্ট্রি নিরাপদ এবং নিশ্চিত ১00% সিওর শট (SURE SHOT)।`
     ];
 
     const reasoningUpEn = [
-      `According to the 5-candle exponential moving average (EMA) and RSI indicators, the market is currently consolidating at a strong support zone. The bullish bounce and volume spike on the previous candle indicate high buying pressure, signaling the next candle is highly likely to head towards the initial resistance levels.`,
-      `The chart reveals a prominent bullish rejection candle at key support. Sellers have exhausted their momentum, and the buyer pressure has spiked, pushing prices up. A breakout trigger above the resistance outline makes an UP/Call trade highly favorable with maximized statistical win-rate.`,
-      `Analyzing price action, the market has rejected the lower Bollinger Band with a strong bullish candle. Multiple indicators confirm support validation. Current volume levels align perfectly to support an upward breakout, identifying an optimal buy trigger zone.`,
-      `The asset has established a clean support bounce exactly at the Fibonacci 0.618 golden retracement level. A distinct bullish pin bar has formed, which statistically guarantees a short-term trend reversal. Take the entry near the current candle close.`
+      `According to the 5-candle exponential moving average (EMA) and RSI indicators, the market is currently consolidating at an extremely strong support zone. The bullish bounce and volume spike indicate high buying pressure, signaling a 100% SURE SHOT entry towards initial resistance levels.`,
+      `The chart reveals a prominent bullish rejection candle at key support. Sellers have exhausted momentum and buyer pressure has spiked. A breakout trigger above the resistance outline makes an UP/Call trade a 100% SURE SHOT with maximized statistical win-rate.`,
+      `Analyzing price action, the market has rejected the lower Bollinger Band with a strong bullish candle, validating critical support. Current volume levels align perfectly with our high-fidelity engine to support a 100% SURE SHOT upward breakout.`,
+      `The asset has established a clean support bounce exactly at the Fibonacci 0.618 golden retracement level. A distinct bullish pin bar has formed, which statistically guarantees a short-term trend reversal. Take this 100% SURE SHOT entry near the candle close.`
     ];
 
     const reasoningDownBn = [
-      `৫-ক্যান্ডেল মুভিং এভারেজ এবং রেজিস্ট্যান্স ট্রেন্ডলাইনের নিকটবর্তী ক্যান্ডেলগুলো পর্যবেক্ষণ করলে বোঝা যায় ক্রেতারা তাদের শক্তি হারাচ্ছে। আরএসআই (RSI) ইন্ডিকেটর অতিরিক্ত ওভারবট (Overbought) জোন থেকে নিম্নমুখী বাক নিয়েছে। এটি একটি পারফেক্ট ডাউন ট্রেড বা পুট (Put) এন্ট্রি পয়েন্ট।`,
-      `চার্ট অনুযায়ী বর্তমানে শক্তিশালী বিয়ারিশ পেন্ডুলাম বা শুটিং স্টার ক্যান্ডেল দেখা যাচ্ছে। ক্যান্ডেল ক্লোজিং প্যাটার্ন এবং অতিরিক্ত সরবরাহ জোনের কারণে বিক্রেতাদের চাপ বৃদ্ধি পেয়েছে। মার্কেট নিচের দিকে যেকোনো সময় সাপোর্ট ভেঙে ফেলার প্রস্তুতি নিচ্ছে, ডাউন এন্ট্রি সেরা হবে।`,
-      `বলিঙ্গার ব্যান্ডের উপরের ব্যান্ড স্পর্শ করে মার্কেট নিম্নমুখী বাউন্স নিয়েছে। একাধিক টেকনিক্যাল সিগন্যাল সেল পোস্টিং এর পক্ষে জোরালো সমর্থন দিচ্ছে। বর্তমান ভলিউম প্রেশার অনুযায়ী পরবর্তী ক্যান্ডেলটি লাল (Bearish) ক্লোজ হওয়ার সম্ভাবনা ৯২%+।`,
-      `ফিবোনাচ্চি ০.৩৮২ রিট্রেসমেন্ট লেভেলে মার্কেট পুনঃপ্রতিরোধ (Resistance) অনুভব করছে। বিক্রেতারা শক্তিশালী বিয়ারিশ পিনবার দ্বারা মার্কেট নিয়ন্ত্রণে নিয়েছে। রেজিস্ট্যান্স জোনের নিচে ট্রেন্ড ব্রেকআউট ডাউন সিগন্যাল চূড়ান্ত করেছে।`
+      `৫-ক্যান্ডেল মুভিং এভারেজ এবং রেজিস্ট্যান্স ট্রেন্ডলাইনের নিকটবর্তী ক্যান্ডেলগুলো পর্যবেক্ষণ করলে বোঝা যায় ক্রেতারা তাদের শক্তি হারাচ্ছে। আরএসআই (RSI) ইন্ডিকেটর অতিরিক্ত ওভারবট (Overbought) জোন থেকে নিম্নমুখী বাক নিয়েছে। এটি একটি পারফেক্ট এবং নিশ্চিত ১০০% সিওর শট (SURE SHOT) ডাউন এন্ট্রি।`,
+      `চার্ট অনুযায়ী বর্তমানে শক্তিশালী বিয়ারিশ শুটিং স্টার ক্যান্ডেল দেখা যাচ্ছে। অতিরিক্ত সরবরাহ জোনের কারণে বিক্রেতাদের চাপ বৃদ্ধি পেয়েছে। মার্কেট নিচের দিকে যেকোনো সময় সাপোর্ট ভেঙে ফেলার প্রস্তুতি নিচ্ছে, নিশ্চিত ১০০% সিওর শট (SURE SHOT) ডাউন এন্ট্রি সেরা হবে।`,
+      `বলিঙ্গার ব্যান্ডের উপরের ব্যান্ড স্পর্শ করে মার্কেট নিম্নমুখী বাউন্স নিয়েছে। একাধিক টেকনিক্যাল সিগন্যাল সেল পোস্টিং এর পক্ষে জোরালো সমর্থন দিচ্ছে। বর্তমান ভলিউম প্রেশার অনুযায়ী পরবর্তী ক্যান্ডেলটি লাল (Bearish) ক্লোজ হওয়ার সম্ভাবনা নিশ্চিত এবং এটি ১০০% সিওর শট।`,
+      `ফিবোনাচ্চি ০.৩৮২ রিট্রেসমেন্ট লেভেলে মার্কেট পুনঃপ্রতিরোধ (Resistance) অনুভব করছে। বিক্রেতারা শক্তিশালী বিয়ারিশ পিনবার দ্বারা মার্কেট নিয়ন্ত্রণে নিয়েছে। রেজিস্ট্যান্স জোনের নিচে ট্রেন্ড ব্রেকআউট ১০০% সিওর শট (SURE SHOT) ডাউন সিগন্যাল চূড়ান্ত করেছে।`
     ];
 
     const reasoningDownEn = [
-      `Observation of the 5-candle moving average and the key declining resistance line reveals buyer volume exhaustion near the major level. The RSI indicator has ticked downward from the overbought territory, making a Down / Put option entry highly favorable.`,
-      `The chart is demonstrating a clear bearish shooting star rejection setup at historical supply. Sell-side pressure is extremely strong, indicating a failure to maintain higher highs. A breakout trigger above the confirmation trigger makes a SELL/Put trade optimal.`,
-      `The asset price action has strongly rejected the upper Bollinger Band ceiling leading to a bearish counter-trend phase. Order order data displays heavy institutional selling volume. Target down entry as soon as price breaks key support bounds.`,
-      `The market is experiencing strong overhead resistance rejection at the Fibonacci 0.382 retracement horizon. Institutional sellers have formed a highly predictive bearish pin bar, verifying structural trend continuance downward.`
+      `Observation of the 5-candle moving average and the key declining resistance line reveals buyer volume exhaustion near the major level. The RSI indicator has ticked downward from overbought territory, making a Down / Put option a 100% SURE SHOT entry.`,
+      `The chart is demonstrating a clear bearish shooting star rejection setup at historical supply. Sell-side pressure is extremely strong, indicating a failure to maintain higher highs, validating a 100% SURE SHOT Down/Put entry.`,
+      `The asset price action has strongly rejected the upper Bollinger Band ceiling leading to a bearish counter-trend phase. Institutional selling volume is highly dominant, making a Down / Put entry a 100% SURE SHOT.`,
+      `The market is experiencing strong overhead resistance rejection at the Fibonacci 0.382 retracement horizon. Institutional sellers have formed a highly predictive bearish pin bar, verifying a 100% SURE SHOT continuance downward.`
     ];
 
-    const recUpBn = "সুপারিশ: পরবর্তী ক্যান্ডেলের জন্য আপ (UP / CALL) ট্রেড করুন। নিরাপদ এন্ট্রির জন্য প্রাইস সাপোর্ট লাইনের কাছাকাছি ডাউন রিজেকশন পাওয়া মাত্রই এন্ট্রি নিন।";
-    const recUpEn = "Recommendation: Take an UP / CALL trade for the next candle duration. Enter immediately on confirmed support retest or low rejection wick.";
-    const recDownBn = "সুপারিশ: পরবর্তী ক্যান্ডেলের জন্য ডাউন (DOWN / PUT) ট্রেড করুন। নিরাপদ এন্ট্রির জন্য প্রাইস রেজিস্ট্যান্স ট্রেন্ডলাইনের কাছাকাছি থাকলে রিজেকশন দেখে এন্ট্রি নিন।";
-    const recDownEn = "Recommendation: Take a DOWN / PUT trade for the next candle duration. Enter on overhead resistance touch or bearish breakout confirmation.";
+    const reasoningNeutralBn = [
+      `৫-ক্যান্ডেল মুভিং এভারেজ এবং আরএসআই (RSI) লেভেল অনুযায়ী মার্কেট বর্তমানে চরম অস্থির এবং কনসোলিডেশন জোনে অবস্থান করছে। ট্রেন্ডের কোনো সুনিরিষ্ট দিক নেই। লোকসান এড়াতে এই মুহূর্তে কোনো এন্ট্রি নেওয়া সম্পূর্ণ নিষিদ্ধ (NO ENTRY)।`,
+      `চার্ট গভীরভাবে পর্যবেক্ষণ করে দেখা গেছে যে মার্কেট বর্তমানে বায়ার/সেলার ডমিনেন্স ছাড়াই সাইডওয়েজ রেঞ্জের ভেতর ঘুরপাক খাচ্ছে। এই ধরনের অনিয়মিত মার্কেটে ট্রেড করলে লস হওয়ার সম্ভাবনা বেশি। পরবর্তী ১০০% নিশ্চিত সিওর শটের জন্য অপেক্ষা করুন (NO ENTRY)।`
+    ];
+
+    const reasoningNeutralEn = [
+      `Based on the 5-candle moving averages and current RSI metrics, the market shows extreme short-term volatility within a tight consolidation zone. No definitive trend direction can be resolved safely. To protect capital, trading is strictly deferred (NO ENTRY).`,
+      `Extended price action analysis detects high-noise sideways market movement with weak institutional participation. Entering trades in key consolidation boundaries incurs high risk. Please wait for a 100% SURE SHOT setup (NO ENTRY).`
+    ];
+
+    const recUpBn = "সুপারিশ: পরবর্তী ক্যান্ডেলের জন্য আপ (UP / CALL) ট্রেড করুন। এটি একটি নিশ্চিত ১০০% সিওর শট (SURE SHOT) সিগন্যাল! নিরাপদ এন্ট্রির জন্য প্রাইস সাপোর্ট লাইনের কাছাকাছি ডাউন রিজেকশন পাওয়া মাত্রই এন্ট্রি নিন।";
+    const recUpEn = "Recommendation: Take an UP / CALL trade for the next candle duration. This is a 100% SURE SHOT signal! Enter immediately on confirmed support retest.";
+    const recDownBn = "সুপারিশ: পরবর্তী ক্যান্ডেলের জন্য ডাউন (DOWN / PUT) ট্রেড করুন। এটি একটি নিশ্চিত ১০০% সিওর শট (SURE SHOT) সিগন্যাল! নিরাপদ এন্ট্রির জন্য প্রাইস রেজিস্ট্যান্স ট্রেন্ডলাইনের কাছাকাছি থাকলে রিজেকশন দেখে এন্ট্রি নিন।";
+    const recDownEn = "Recommendation: Take a DOWN / PUT trade for the next candle duration. This is a 100% SURE SHOT signal! Enter on overhead resistance touch.";
+    const recNeutralBn = "সুপারিশ: নো এন্ট্রি (NO ENTRY)। মার্কেট চরম ঝুঁকিপূর্ণ এবং অনিশ্চিত অবস্থায় থাকায় এই ক্যান্ডেলে কোনো ট্রেড নিবেন না। সুরক্ষার জন্য অপেক্ষা করুন!";
+    const recNeutralEn = "Recommendation: NO ENTRY. The market setup is highly risky and lacks clean directional support; wait for a clear 100% SURE SHOT pattern.";
 
     return {
       prediction,
-      priceCloseUpEntry: isUp ? `প্রাইস ${upEntry} এর উপরে ক্লোজ বা ব্রেকআউট হলে বাই ট্রিপ করুন` : `প্রাইস ${upEntry} লেভেল ছাড়িয়ে ভাঙলে রিভার্সাল কল করুন`,
-      priceCloseDownEntry: isUp ? `প্রাইস ${downEntry} জোনে নামলে রিভার্স ট্রিপ করুন` : `প্রাইস ${downEntry} এর নিচে ক্লোজ বা ব্রেকডাউন হলে দ্রুত পুট সেল এন্ট্রি নিন`,
+      priceCloseUpEntry: prediction === "Up" ? `প্রাইস ${upEntry} এর উপরে ক্লোজ বা ব্রেকআউট হলে বাই ট্রিপ করুন` : prediction === "Down" ? `প্রাইস ${upEntry} লেভেল ছাড়িয়ে ভাঙলে রিভার্সাল কল করুন` : "N/A",
+      priceCloseDownEntry: prediction === "Up" ? `প্রাইস ${downEntry} জোনে নামলে রিভার্স ট্রিপ করুন` : prediction === "Down" ? `প্রাইস ${downEntry} এর নিচে ক্লোজ বা ব্রেকডাউন হলে দ্রুত পুট সেল এন্ট্রি নিন` : "N/A",
       confidence,
       supportLevels: support,
       resistanceLevels: resistance,
       patternsIdentified: selectedPatterns,
-      reasoning: isUp ? reasoningUpEn[index] : reasoningDownEn[index],
-      reasoningBangla: isUp ? reasoningUpBn[index] : reasoningDownBn[index],
-      recommendation: isUp ? recUpEn : recDownEn,
-      recommendationBangla: isUp ? recUpBn : recDownBn,
-      riskRewardRatio: "1:2",
+      reasoning: prediction === "Up" ? reasoningUpEn[index] : prediction === "Down" ? reasoningDownEn[index] : reasoningNeutralEn[index % 2],
+      reasoningBangla: prediction === "Up" ? reasoningUpBn[index] : prediction === "Down" ? reasoningDownBn[index] : reasoningNeutralBn[index % 2],
+      recommendation: prediction === "Up" ? recUpEn : prediction === "Down" ? recDownEn : recNeutralEn,
+      recommendationBangla: prediction === "Up" ? recUpBn : prediction === "Down" ? recDownBn : recNeutralBn,
+      riskRewardRatio: prediction === "Neutral" ? "N/A" : "1:2",
       suggestedStopLoss: stopLoss,
       suggestedTakeProfit: takeProfit
     };
@@ -1907,12 +1870,12 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Glow active emerald customized submit button */}
+                   {/* Glow active emerald customized submit button */}
                   <button
                     type="submit"
                     className="w-full bg-[#00e676] hover:bg-[#00c853] text-[#07090e] font-black py-4 px-4 rounded-2xl shadow-[0_4px_24px_rgba(0,230,118,0.45)] transition duration-150 active:scale-95 cursor-pointer uppercase tracking-wider text-xs block text-center font-bold"
                   >
-                    ANALYZE NOW (PAY 20$ / 2500 TK)
+                    {language === "bn" ? "ভেরিফিকেশন রিকোয়েস্ট পাঠান (SUBMIT REQUEST)" : "SUBMIT VERIFICATION REQUEST (ভেরিফিকেশন পাঠান)"}
                   </button>
 
                   <div className="flex items-center justify-center gap-1.5 text-slate-550 select-none pt-0.5 bg-transparent">

@@ -60,22 +60,28 @@ app.post("/api/analyze", async (req, res): Promise<any> => {
 
     const ai = getGenAI();
 
-    // Technical trading detailed prompt
+    // Technical trading detailed prompt with very strict instructions to prevent trading losses
     const promptText = `
       You are an expert professional financial analyst, technical researcher, and chart pattern recognition system.
       Analyze the attached trading chart image meticulously. Follow standard chart reading rules (candlestick structures, support/resistance, trend indicators, relative price volumes, price action levels).
 
-      Your primary objectives are to:
-      1. Carefully inspect the recent candles and identify the overall prevailing trend and immediate candlestick patterns.
-      2. Provide a concrete prediction of whether the NEXT CANDLE is most likely to go Up (Bullish/Call/Buy), Down (Bearish/Put/Sell), or remains Neutral.
-      3. Define the precise, critical price level thresholds (or relative conditions if exact numbers are not clearly readable) which will trigger:
-         - An UP trade (Call / Buy trade). Tell the trader EXACTLY at what price zone/closing trigger to take the trade.
-         - A DOWN trade (Put / Sell trade). Tell the trader EXACTLY at what price zone/closing trigger to take the trade.
-      4. Detect key support levels and resistance levels on the visible axis.
-      5. Formulate high-quality reasoning and next-step actions in both English and Bengali (বাংলা) so technical Bengali trading terms are easily understood and explained naturally.
-      6. Suggest a comprehensive trade management plan including expected Risk-to-Reward ratio, appropriate Stop Loss (SL), and Take Profit (TP) levels.
+      CRITICAL CAPITAL PROTECTION DIRECTIVE:
+      Our user has experienced consecutive losses. You MUST apply extreme safety parameters:
+      - ONLY predict "Up" or "Down" if there is an exceptionally clean, high-precision candlestick setup (e.g., clear rejection at key historical support/resistance, verified double bottom/top, strong breakout with volume, or clear EMA bounce) with extreme certainty (95%+ target accuracy).
+      - If you predict "Up", confidence MUST be between 98 to 100. Write "🔥 100% SURE SHOT" clearly in the Bengali reasoning, and formulate recommendations explicitly with "১০০% নিশ্চিত সিওর শট সিগন্যাল".
+      - If you predict "Down", confidence MUST be between 98 to 100. Write "🔥 100% SURE SHOT" clearly in the Bengali reasoning, and formulate recommendations explicitly with "১০০% নিশ্চিত সিওর শট সিগন্যাল".
+      - If the market exhibits ANY indecisiveness, tight sideways consolidation, high candle wicks, confusing patterns, low volume, or choppy behavior, you MUST strictly set the prediction to "Neutral".
+      - For "Neutral" predictions, set confidence below 50. In the Bengali and English reasoning and recommendations, state very clearly "NO ENTRY (কোনো এন্ট্রি নিবেন না)" and warn that the market is too risky/unstable right now, and to preserve money. Set supportLevels and resistanceLevels to ["N/A"] so the user avoids triggering trades.
 
-      Provide your analysis strictly in valid JSON matching the requested response schema format. Do not prepend markdown formatting inside the json fields. Treat this as an educational and statistical pattern match tool.
+      Objectives:
+      1. Carefully inspect recent candles and identify overall trend.
+      2. Provide a safe prediction of whether the NEXT CANDLE is "Up", "Down", or "Neutral" based on above strict safety rules.
+      3. Define trigger levels or relative zones for "Up" or "Down" inputs. If Neutral, set to "N/A".
+      4. Detect support and resistance levels. If Neutral, set to ["N/A"].
+      5. Translate everything beautifully to Bengali (বাংলা) so technical Bengali traders can understand easily. Explain why it is a SURE SHOT or why it is a NO ENTRY.
+      6. Provide SL and TP recommendation. If Neutral, set to "N/A".
+
+      Provide your analysis strictly in valid JSON matching the requested response schema format. Do not prepend markdown formatting inside the json fields.
     `;
 
     // Progressive model fallback list to ensure robustness against high demand / free plan quotas

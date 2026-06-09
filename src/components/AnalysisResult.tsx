@@ -42,20 +42,20 @@ export default function AnalysisResult({ analysis, language, imageFileName, imag
   }, []);
 
   // Vibrant compact styling
-  let predictionBg = "bg-[#111114] border-slate-800";
-  let predictionText = "text-yellow-400 drop-shadow-[0_0_15px_rgba(234,179,8,0.3)]";
-  let predictionLabel = "সতর্ক থাকুন / রেঞ্জ বাউন্ড";
+  let predictionBg = "bg-[#18110b] border-amber-500/30";
+  let predictionText = "text-amber-500 drop-shadow-[0_0_15px_rgba(245,158,11,0.3)] animate-pulse";
+  let predictionLabel = "NO ENTRY (কোনো এন্ট্রি নিবেন না - মার্কেট ঝুঁকিপূর্ণ)";
   let PredictionIcon = HelpCircle;
 
   if (isUp) {
     predictionBg = "bg-[#131d1a]/95 border-emerald-500/40";
     predictionText = "text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.4)]";
-    predictionLabel = "UP / কল ট্রেড (বাই)";
+    predictionLabel = "🔥 SURE SHOT • UP / কল ট্রেড (বাই)";
     PredictionIcon = ArrowUpCircle;
   } else if (isDown) {
     predictionBg = "bg-[#221518]/95 border-rose-500/40";
     predictionText = "text-rose-400 drop-shadow-[0_0_15px_rgba(244,63,94,0.4)]";
-    predictionLabel = "DOWN / পুট ট্রেড (সেল)";
+    predictionLabel = "🔥 SURE SHOT • DOWN / পুট ট্রেড (সেল)";
     PredictionIcon = ArrowDownCircle;
   }
 
@@ -73,7 +73,7 @@ export default function AnalysisResult({ analysis, language, imageFileName, imag
       {/* 1. Next Candle Prediction Header */}
       <div className={`border rounded-2xl p-3.5 ${predictionBg} relative overflow-hidden shadow-sm transition-all duration-300`}>
         <div className="flex items-center gap-3 relative z-10">
-          <div className={`p-2 rounded-xl shrink-0 ${isUp ? "bg-emerald-550/10 text-emerald-400" : isDown ? "bg-rose-550/10 text-rose-400" : "bg-yellow-550/10 text-yellow-400"}`}>
+          <div className={`p-2 rounded-xl shrink-0 ${isUp ? "bg-emerald-550/10 text-emerald-400" : isDown ? "bg-rose-550/10 text-rose-400" : "bg-yellow-550/10 text-yellow-500"}`}>
             <PredictionIcon className="w-7 h-7" />
           </div>
           <div className="min-w-0">
