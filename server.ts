@@ -43,7 +43,7 @@ app.get("/api/health", (req, res) => {
 // Primary Endpoint: Trading Chart pattern analyzer
 app.post("/api/analyze", async (req, res): Promise<any> => {
   try {
-    const { image } = req.body;
+    const { image, precision } = req.body;
 
     if (!image) {
       return res.status(400).json({ error: "Image data is required" });
@@ -61,7 +61,7 @@ app.post("/api/analyze", async (req, res): Promise<any> => {
     const ai = getGenAI();
 
     // Technical trading detailed prompt with very strict instructions to prevent trading losses
-    const promptText = `
+    let promptText = `
       You are an expert professional financial analyst, technical researcher, and chart pattern recognition system.
       Analyze the attached trading chart image meticulously. Follow standard chart reading rules (candlestick structures, support/resistance, trend indicators, relative price volumes, price action levels).
 
@@ -72,6 +72,20 @@ app.post("/api/analyze", async (req, res): Promise<any> => {
       - If you predict "Down", confidence MUST be between 98 to 100. Write "🔥 100% SURE SHOT" clearly in the Bengali reasoning, and formulate recommendations explicitly with "১০০% নিশ্চিত সিওর শট সিগন্যাল".
       - If the market exhibits ANY indecisiveness, tight sideways consolidation, high candle wicks, confusing patterns, low volume, or choppy behavior, you MUST strictly set the prediction to "Neutral".
       - For "Neutral" predictions, set confidence below 50. In the Bengali and English reasoning and recommendations, state very clearly "NO ENTRY (কোনো এন্ট্রি নিবেন না)" and warn that the market is too risky/unstable right now, and to preserve money. Set supportLevels and resistanceLevels to ["N/A"] so the user avoids triggering trades.
+    `;
+
+    if (precision === "sureshot") {
+      promptText += `
+      
+      STRICT MAXIMUM PROTECTION ENFORCEMENT:
+      The user is operating in "🔥 100% SURE SHOTS ONLY" mode.
+      - Unless this chart displays a pristine, textbook-perfect, high-probability pattern bounce or breakout with absolute confirmation, you MUST output "Neutral".
+      - Do NOT make any predictions of "Up" or "Down" for flat ranges, small candle sizes, weak volumes, mixed indicators, or any uncertain trend direction.
+      - Better to give "Neutral" than to risk a losing trade. 90% of tricky setups should be returned as "Neutral" in this mode to preserve capital.
+      `;
+    }
+
+    promptText += `
 
       Objectives:
       1. Carefully inspect recent candles and identify overall trend.

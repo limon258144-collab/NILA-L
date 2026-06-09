@@ -136,9 +136,14 @@ export default function AnalysisResult({ analysis, language, imageFileName, imag
           )}
 
           {(!supportLevels || supportLevels[0] === "N/A") && (!resistanceLevels || resistanceLevels[0] === "N/A") && (
-            <p className="text-slate-400 font-normal italic">
-              কোনো ক্যান্ডেলস্টিক ক্লোজিং মার্ক বা লেভেল পাওয়া যায়নি। ক্যান্ডেল ক্লোজিং সময়ের আগে তড়িঘড়ি করে ট্রেড নেওয়া থেকে বিরত থাকুন।
-            </p>
+            <div className="bg-[#18110b] border border-amber-500/30 rounded-xl p-4 space-y-2 text-center">
+              <span className="text-amber-500 font-black text-xs sm:text-sm block">⚠️ NO ENTRY (ট্রেড করা থেকে বিরত থাকুন) ⚠️</span>
+              <p className="text-slate-350 text-xs leading-relaxed">
+                {language === "bn"
+                  ? "মার্কেট বর্তমানে চরম অনির্দিষ্ট এবং ঝুঁকিপূর্ণ অবস্থায় রয়েছে। কোনো স্পট বা রিলায়েবল ক্যান্ডেলস্টিক বাউন্স পাওয়া যায়নি। ভুল এন্ট্রি নিয়ে লোকসান এড়াতে এই ক্যান্ডেলে কোনো ট্রেড নিবেন না। অনুগ্রহ করে পরবর্তী ১০০% সিওর শট সিগন্যালের জন্য অপেক্ষা করুন।"
+                  : "The market setup is highly volatile and lacks clear directional movement. Empty or choppy parameters detected. Please do not take any entries now to safeguard your capital. Wait for a clear 100% SURE SHOT confirmation."}
+              </p>
+            </div>
           )}
         </div>
       </div>
