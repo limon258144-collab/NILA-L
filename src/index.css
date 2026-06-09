@@ -69,3 +69,20 @@
   animation: telegram-float-glow 2.5s infinite ease-in-out;
 }
 
+/* Subtle breathing scale pulse animation for prominent CTA buttons */
+@keyframes breath-scale {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 20px rgba(79, 70, 229, 0.3);
+  }
+  50% {
+    transform: scale(1.025);
+    box-shadow: 0 4px 30px rgba(99, 102, 241, 0.6);
+  }
+}
+
+.animate-breath {
+  animation: breath-scale 2.2s infinite ease-in-out;
+}
+
+

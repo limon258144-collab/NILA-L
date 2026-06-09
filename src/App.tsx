@@ -1243,7 +1243,7 @@ export default function App() {
                       className={`w-full font-black py-3.5 px-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition duration-150 active:scale-95 cursor-pointer ${
                         !isUserAdmin(currentUser) && checkAnalysisLimit(currentUser || "").remaining <= 0
                           ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50 shadow-none"
-                          : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20"
+                          : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20 animate-breath"
                       }`}
                     >
                       <Search className="w-5 h-5" />
@@ -1298,86 +1298,6 @@ export default function App() {
                 /* Standard Uploader dashboard */
                 <div className="space-y-5 animate-fade-in">
                   
-                  <div className="bg-[#111116] border-2 border-indigo-500/20 rounded-3xl p-5 text-center relative overflow-hidden">
-                    <div className="absolute -right-12 -top-12 w-28 h-28 bg-[#c084fc]/10 rounded-full blur-2xl pointer-events-none" />
-                    <h3 className="text-white font-display font-black text-base mb-1">
-                      কোনো ট্রেডিং চার্ট ফাইল নেই
-                    </h3>
-                    <p className="text-xs text-slate-400 leading-relaxed font-semibold">
-                      আপনার কিউএল, পকেট অপশন বা ট্রেডিংভিউ চার্টের স্ক্রিনশট নিচে আপলোড করুন। পরবর্তী ক্যান্ডেলের জন্য এন্ট্রি দাও, তার আগে না!
-                    </p>
-                  </div>
-
-                  {/* Visual Signal Precision Filter */}
-                  <div className="bg-[#111116] border-2 border-slate-800 rounded-3xl p-4 md:p-5 space-y-3.5 text-left">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00e676] opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00e676]"></span>
-                        </span>
-                        <h4 className="text-xs uppercase font-mono font-bold tracking-widest text-[#00e676]">
-                          {language === "bn" ? "সিগন্যাল ফিল্টার লেভেল" : "Signal Filter Level"}
-                        </h4>
-                      </div>
-                      <span className="text-[10px] font-mono text-slate-400 font-bold bg-[#181822] border border-slate-800 px-2 py-0.5 rounded-lg uppercase">
-                        {signalPrecision === "sureshot" ? (language === "bn" ? "ভেরিফাইড সিওর শট" : "Verified Sure Shot") : (language === "bn" ? "স্ট্যান্ডার্ড এন্ট্রি" : "Standard Entry")}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSignalPrecision("sureshot");
-                          localStorage.setItem("nila_signal_precision_v1", "sureshot");
-                        }}
-                        className={`p-3 rounded-2xl border transition duration-150 flex flex-col items-center justify-center gap-1 cursor-pointer select-none ${
-                          signalPrecision === "sureshot"
-                            ? "bg-[#101e18] border-[#00e676]/40 text-[#00e676] shadow-[0_0_15px_rgba(0,230,118,0.15)]"
-                            : "bg-[#09090c]/45 border-slate-900 text-slate-400 hover:border-slate-850"
-                        }`}
-                      >
-                        <span className="text-xs font-black tracking-tight text-center">
-                          {language === "bn" ? "🔥 ১০০% সিওর শট" : "🔥 Sure shots only"}
-                        </span>
-                        <span className="text-[9px] font-mono text-slate-500 font-bold leading-tight">
-                          {language === "bn" ? "কঠোর সেফটি ফিল্টার" : "Maximum Filter"}
-                        </span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSignalPrecision("standard");
-                          localStorage.setItem("nila_signal_precision_v1", "standard");
-                        }}
-                        className={`p-3 rounded-2xl border transition duration-150 flex flex-col items-center justify-center gap-1 cursor-pointer select-none ${
-                          signalPrecision === "standard"
-                            ? "bg-[#18110b] border-amber-500/40 text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.15)]"
-                            : "bg-[#09090c]/45 border-slate-900 text-slate-400 hover:border-slate-850"
-                        }`}
-                      >
-                        <span className="text-xs font-black tracking-tight text-center">
-                          {language === "bn" ? "সাধারণ সিগন্যাল" : "Standard Analysis"}
-                        </span>
-                        <span className="text-[9px] font-mono text-slate-500 font-bold leading-tight">
-                          {language === "bn" ? "মাঝারি একুরেসি" : "Normal Density"}
-                        </span>
-                      </button>
-                    </div>
-
-                    <p className="text-[10px] sm:text-[11px] text-slate-400 font-semibold leading-relaxed italic text-center bg-[#09090c]/40 p-3 rounded-2xl border border-slate-900">
-                      {signalPrecision === "sureshot"
-                        ? (language === "bn" 
-                            ? "⚠️ সিওর শট মোড অন আছে! সিস্টেম কেবল ১০০% লাভজনক সুনির্দিষ্ট লেভেলে সিগন্যাল দিবে। সন্দেহজনক বা কমজোড় মার্কেটে সরাসরি 'NO ENTRY' সিগন্যাল আসবে।" 
-                            : "⚠️ Sure Shot Filter Active! Under choppy markets, the engine enforces strict \"NO ENTRY\" to secure your funds from speculative trade losses.")
-                        : (language === "bn" 
-                            ? "সাধারণ মোড প্রতিটি চার্ট থেকে কোনো না কোনো সম্ভাব্য ডিরেকশন বের করার চেষ্টা করে। এটি নতুনদের জন্য কিছুটা ঝুঁকিপূর্ণ হতে পারে।" 
-                            : "Standard mode forces an active prediction even in moderate conviction setups. Caution recommended.")}
-                    </p>
-                  </div>
-
                   <UploadArea
                     onImageSelected={handleImageSelected}
                     language={language}
