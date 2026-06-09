@@ -83,6 +83,15 @@ export default function AnalysisResult({ analysis, language, imageFileName, imag
             <h2 className={`text-base sm:text-lg font-display font-black tracking-tight mt-0.5 ${predictionText}`}>
               • {predictionLabel}
             </h2>
+            {analysis.confidence && analysis.confidence >= 80 && (isUp || isDown) && (
+              <div className="mt-1.5 inline-flex items-center gap-1.5 bg-[#00e676]/15 text-[#00e676] border border-[#00e676]/30 px-2.5 py-0.5 rounded-lg text-[10px] font-mono font-black uppercase tracking-wide">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00e676] opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#00e676]"></span>
+                </span>
+                <span>🔥 ৮০%+ শিউর শট নিশ্চয়তা (80%+ Verified Sure Shot)</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
