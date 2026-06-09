@@ -343,7 +343,7 @@ export default function App() {
     );
   };
 
-  // Analysis rate limiting (Max 2 per day per user account, excluding master accounts)
+  // Analysis rate limiting (Max 20 per day per user account, excluding master accounts)
   const checkAnalysisLimit = (username: string): { allowed: boolean; remaining: number; count: number } => {
     if (isUserAdmin(username) || checkUserProStatus(username)) {
       return { allowed: true, remaining: 999, count: 0 };
@@ -358,11 +358,11 @@ export default function App() {
       const activeTimestamps = userTimestamps.filter(t => t > oneDayAgo);
       
       const count = activeTimestamps.length;
-      const remaining = Math.max(0, 2 - count);
+      const remaining = Math.max(0, 20 - count);
       return { allowed: remaining > 0, remaining, count };
     } catch (e) {
       console.error(e);
-      return { allowed: true, remaining: 2, count: 0 };
+      return { allowed: true, remaining: 20, count: 0 };
     }
   };
 
@@ -1143,8 +1143,8 @@ export default function App() {
                               </span>
                             ) : (
                               language === "bn"
-                                ? `${limitInfo.remaining} টি বাকি (২ টির মধ্যে)`
-                                : `${limitInfo.remaining} remaining (out of 2)`
+                                ? `${limitInfo.remaining} টি বাকি (২০ টির মধ্যে)`
+                                : `${limitInfo.remaining} remaining (out of 20)`
                             )}
                           </div>
                         </div>
@@ -1248,7 +1248,7 @@ export default function App() {
                     >
                       <Search className="w-5 h-5" />
                       {!isUserAdmin(currentUser) && checkAnalysisLimit(currentUser || "").remaining <= 0
-                        ? (language === "bn" ? "দৈনিক লিমিট শেষ (২/২)" : "Daily Limit Reached (2/2)")
+                        ? (language === "bn" ? "দৈনিক লিমিট শেষ (২০/২০)" : "Daily Limit Reached (20/20)")
                         : (language === "bn" ? "বিশ্লেষণ শুরু করুন" : "Start Analysis")}
                     </button>
                     <button
