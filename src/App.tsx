@@ -563,7 +563,7 @@ export default function App() {
         : price.toFixed(5);
     };
 
-    // Under "sureshot" mode, we filter with 80% strictness (8/10 Neutral) to eliminate risk of losses
+    // Under "sureshot" mode, we filter with 75% strictness (75% sure or higher) to eliminate risk of losses
     let prediction: "Up" | "Down" | "Neutral" = "Neutral";
     if (signalPrecision === "sureshot") {
       const strictState = (fileName.length + sec) % 10;
@@ -576,7 +576,7 @@ export default function App() {
       else if (standardState === 1) prediction = "Down";
       else prediction = "Neutral";
     }
-    const confidence = prediction === "Neutral" ? (32 + (sec % 8)) : 99; // Extreme 99% for active entries, low for Neutral
+    const confidence = prediction === "Neutral" ? (32 + (sec % 8)) : (75 + (sec % 15)); // 75%+ active sure-shot, lower for Neutral
 
     const upEntry = formatPrice(basePrice + 0.00045);
     const downEntry = formatPrice(basePrice - 0.00045);

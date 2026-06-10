@@ -59,17 +59,17 @@ export default async function handler(req, res) {
 
     const ai = getGenAI();
 
-    // Technical trading detailed prompt with very strict instructions to prevent trading losses
+    // Critical capital protection & sure-shot settings (minimum 75% confidence limit)
     let promptText = `
       You are an expert professional financial analyst, technical researcher, and chart pattern recognition system.
       Analyze the attached trading chart image meticulously. Follow standard chart reading rules (candlestick structures, support/resistance, trend indicators, relative price volumes, price action levels).
 
-      CRITICAL CAPITAL PROTECTION & SURE-SHOT DIRECTIVE (৮০%+ নিশ্চিত সিগন্যাল):
-      - ONLY predict "Up" or "Down" if there is at least an 80% or higher probability of success (৮০%+ শিউর শট সম্ভাবনা).
-      - If you decide to predict "Up" or "Down", your confidence level MUST be between 80% to 100%. In both 'reasoningBangla' and 'recommendationBangla', you MUST write explicitly: "🔥 এই সিগন্যালে ৮০% এর বেশি শিউর শট সম্ভাবনা রয়েছে" (This signal has an 80%+ sure shot probability).
-      - If you predict "Up", confidence MUST be between 80 to 100. Formulate recommendations explicitly with "৮০%+ নিশ্চিত শিউর শট সিগন্যাল".
-      - If you predict "Down", confidence MUST be between 80 to 100. Formulate recommendations explicitly with "৮০%+ নিশ্চিত শিউর শট সিগন্যাল".
-      - If the market has any high-risk setup, ranges, choppy patterns, or anything that is less than 80% sure, you MUST strictly set the prediction to "Neutral".
+      CRITICAL CAPITAL PROTECTION & SURE-SHOT DIRECTIVE (৭৫%+ নিশ্চিত সিগন্যাল):
+      - ONLY predict "Up" or "Down" if there is at least a 75% or higher probability of success (৭৫%+ শিউর শট সম্ভাবনা).
+      - If you decide to predict "Up" or "Down", your confidence level MUST be between 75% to 100%. In both 'reasoningBangla' and 'recommendationBangla', you MUST write explicitly: "🔥 এই সিগন্যালে ৭৫% এর বেশি শিউর শট সম্ভাবনা রয়েছে" (This signal has a 75%+ sure shot probability).
+      - If you predict "Up", confidence MUST be between 75 to 100. Formulate recommendations explicitly with "৭৫%+ নিশ্চিত শিউর শট সিগন্যাল".
+      - If you predict "Down", confidence MUST be between 75 to 100. Formulate recommendations explicitly with "৭৫%+ নিশ্চিত শিউর শট সিগন্যাল".
+      - If the market has any high-risk setup, ranges, choppy patterns, or anything that is less than 75% sure, you MUST strictly set the prediction to "Neutral".
       - For "Neutral" predictions, set confidence below 50. In the Bengali and English reasoning and recommendations, state very clearly "NO ENTRY (কোনো এন্ট্রি নিবেন না)" and warn that the market is too risky/unstable right now, and to preserve money. Set supportLevels and resistanceLevels to ["N/A"] so the user avoids triggering trades.
     `;
 
@@ -88,10 +88,10 @@ export default async function handler(req, res) {
 
       Objectives:
       1. Carefully inspect recent candles and identify overall trend.
-      2. Provide a safe prediction of whether the NEXT CANDLE is "Up", "Down", or "Neutral" based on above strict safety rules (minimum 80% confidence required for active Up or Down).
+      2. Provide a safe prediction of whether the NEXT CANDLE is "Up", "Down", or "Neutral" based on above strict safety rules (minimum 75% confidence required for active Up or Down).
       3. Define trigger levels or relative zones for "Up" or "Down" inputs. If Neutral, set to "N/A".
       4. Detect support and resistance levels. If Neutral, set to ["N/A"].
-      5. Translate everything beautifully to Bengali (বাংলা) so technical Bengali traders can understand easily. Explain why it is an 80%+ SURE SHOT or why it is a NO ENTRY.
+      5. Translate everything beautifully to Bengali (বাংলা) so technical Bengali traders can understand easily. Explain why it is an 75%+ SURE SHOT or why it is a NO ENTRY.
       6. Provide SL and TP recommendation. If Neutral, set to "N/A".
 
       Provide your analysis strictly in valid JSON matching the requested response schema format. Do not prepend markdown formatting inside the json fields.
