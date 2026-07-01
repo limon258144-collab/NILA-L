@@ -15,9 +15,9 @@ interface Props {
   imageDataUrl: string;
 }
 
-export default function AnalysisResult({ analysis, language, imageFileName, imageDataUrl }: Props) {
-  const isUp = analysis.prediction?.toLowerCase() === "up";
-  const isDown = analysis.prediction?.toLowerCase() === "down";
+export default function AnalysisResult({ analysis = {} as TradingAnalysis, language, imageFileName, imageDataUrl }: Props) {
+  const isUp = analysis?.prediction?.toLowerCase() === "up";
+  const isDown = analysis?.prediction?.toLowerCase() === "down";
 
   const [telegram, setTelegram] = React.useState("https://t.me/poketbrokar");
   const [owner1, setOwner1] = React.useState("nila\\ldp.onar");
@@ -60,13 +60,13 @@ export default function AnalysisResult({ analysis, language, imageFileName, imag
   }
 
   // Fallback support and resistance levels from fields if missing in arrays
-  const supportLevels = (analysis.supportLevels && analysis.supportLevels.length > 0) 
+  const supportLevels = (analysis?.supportLevels && analysis.supportLevels.length > 0) 
     ? analysis.supportLevels 
-    : [analysis.priceCloseUpEntry || "N/A"];
+    : [analysis?.priceCloseUpEntry || "N/A"];
 
-  const resistanceLevels = (analysis.resistanceLevels && analysis.resistanceLevels.length > 0) 
+  const resistanceLevels = (analysis?.resistanceLevels && analysis.resistanceLevels.length > 0) 
     ? analysis.resistanceLevels 
-    : [analysis.priceCloseDownEntry || "N/A"];
+    : [analysis?.priceCloseDownEntry || "N/A"];
 
   return (
     <div id="trading-analysis-results" className="space-y-4">
@@ -83,13 +83,13 @@ export default function AnalysisResult({ analysis, language, imageFileName, imag
             <h2 className={`text-base sm:text-lg font-display font-black tracking-tight mt-0.5 ${predictionText}`}>
               • {predictionLabel}
             </h2>
-            {analysis.confidence && analysis.confidence >= 75 && (isUp || isDown) && (
+            {analysis?.confidence && analysis.confidence >= 70 && (isUp || isDown) && (
               <div className="mt-1.5 inline-flex items-center gap-1.5 bg-[#00e676]/15 text-[#00e676] border border-[#00e676]/30 px-2.5 py-0.5 rounded-lg text-[10px] font-mono font-black uppercase tracking-wide">
                 <span className="relative flex h-1.5 w-1.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00e676] opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#00e676]"></span>
                 </span>
-                <span>🔥 ৭৫%+ শিউর শট নিশ্চয়তা (75%+ Verified Sure Shot)</span>
+                <span>🔥 ৭০%+ শিউর শট নিশ্চয়তা (70%+ Verified Sure Shot)</span>
               </div>
             )}
           </div>
@@ -130,17 +130,17 @@ export default function AnalysisResult({ analysis, language, imageFileName, imag
         </div>
         
         <div className="space-y-3 text-xs sm:text-sm text-slate-200 font-semibold leading-relaxed">
-          {supportLevels && supportLevels[0] !== "N/A" && (
+          {resistanceLevels && resistanceLevels[0] !== "N/A" && (
             <div className="bg-emerald-950/15 border border-emerald-500/20 rounded-xl p-3">
               <span className="text-emerald-400 font-bold block mb-1">UP (বুলিশ) ট্রেড এর নিয়ম:</span>
-              রানিং ক্যান্ডেলটি যদি <strong className="text-emerald-300 font-mono text-sm px-2 py-0.5 bg-slate-950 border border-emerald-500/30 rounded-md select-all">{supportLevels[0]}</strong> এর <strong className="text-emerald-400 underline decoration-emerald-500/30">নিচে ক্লোজ দেয়</strong>, তবে পরবর্তী ক্যান্ডেলে সরাসরি <strong className="text-emerald-300 font-black">UP ট্রেড নিন</strong>।
+              রানিং ক্যান্ডেলটি যদি <strong className="text-emerald-300 font-mono text-sm px-2 py-0.5 bg-slate-950 border border-emerald-500/30 rounded-md select-all">{resistanceLevels[0]}</strong> এর উপরে গেলে সরাসরি <strong className="text-emerald-300 font-black">UP ট্রেড নিবেন</strong>।
             </div>
           )}
 
-          {resistanceLevels && resistanceLevels[0] !== "N/A" && (
+          {supportLevels && supportLevels[0] !== "N/A" && (
             <div className="bg-rose-950/15 border border-rose-500/20 rounded-xl p-3">
               <span className="text-rose-400 font-bold block mb-1">DOWN (বেয়ারিশ) ট্রেড এর নিয়ম:</span>
-              রানিং ক্যান্ডেলটি যদি <strong className="text-rose-300 font-mono text-sm px-2 py-0.5 bg-slate-950 border border-rose-500/30 rounded-md select-all">{resistanceLevels[0]}</strong> এর <strong className="text-rose-400 underline decoration-rose-500/30">উপরে ক্লোজ দেয়</strong>, তবে পরবর্তী ক্যান্ডেলে সরাসরি <strong className="text-rose-300 font-black">DOWN ট্রেড নিন</strong>।
+              রানিং ক্যান্ডেলটি যদি <strong className="text-rose-300 font-mono text-sm px-2 py-0.5 bg-slate-950 border border-rose-500/30 rounded-md select-all">{supportLevels[0]}</strong> এর নিচে গেলে সরাসরি <strong className="text-rose-300 font-black">DOWN ট্রেড নিবেন</strong>।
             </div>
           )}
 

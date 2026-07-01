@@ -21,6 +21,7 @@ import {
   Megaphone,
   Check,
   Edit2,
+  Sliders,
 } from "lucide-react";
 import { AnalysisHistoryItem, TradingAnalysis } from "./types";
 import { translations, Language } from "./utils/translations";
@@ -36,7 +37,11 @@ export default function App() {
 
   // Core Precision state - helps user get 100% SURE SHOT (Sonar Signal) only, else NO ENTRY
   const [signalPrecision, setSignalPrecision] = useState<"sureshot" | "standard">(() => {
-    return (localStorage.getItem("nila_signal_precision_v1") as "sureshot" | "standard") || "sureshot";
+    try {
+      return (localStorage.getItem("nila_signal_precision_v1") as "sureshot" | "standard") || "sureshot";
+    } catch (e) {
+      return "sureshot";
+    }
   });
 
   // User Authentication State
@@ -343,7 +348,7 @@ export default function App() {
     );
   };
 
-  // Analysis rate limiting (Max 20 per day per user account, excluding master accounts)
+  // Analysis rate limiting (Max 3 per day per user account, excluding master accounts)
   const checkAnalysisLimit = (username: string): { allowed: boolean; remaining: number; count: number } => {
     if (isUserAdmin(username) || checkUserProStatus(username)) {
       return { allowed: true, remaining: 999, count: 0 };
@@ -358,11 +363,11 @@ export default function App() {
       const activeTimestamps = userTimestamps.filter(t => t > oneDayAgo);
       
       const count = activeTimestamps.length;
-      const remaining = Math.max(0, 20 - count);
+      const remaining = Math.max(0, 3 - count);
       return { allowed: remaining > 0, remaining, count };
     } catch (e) {
       console.error(e);
-      return { allowed: true, remaining: 20, count: 0 };
+      return { allowed: true, remaining: 3, count: 0 };
     }
   };
 
@@ -410,6 +415,7 @@ export default function App() {
   const [mockClock, setMockClock] = useState("10:00 AM");
   const [mockBattery, setMockBattery] = useState(100);
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
+  const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false);
   const [communitySearch, setCommunitySearch] = useState("");
 
   // Update clock & battery animations to make UI highly alive
@@ -563,7 +569,7 @@ export default function App() {
         : price.toFixed(5);
     };
 
-    // Under "sureshot" mode, we filter with 75% strictness (75% sure or higher) to eliminate risk of losses
+    // Under "sureshot" mode, we filter with 70% strictness (70% sure or higher) to eliminate risk of losses
     let prediction: "Up" | "Down" | "Neutral" = "Neutral";
     if (signalPrecision === "sureshot") {
       const strictState = (fileName.length + sec) % 10;
@@ -571,12 +577,12 @@ export default function App() {
       else if (strictState === 1) prediction = "Down";
       else prediction = "Neutral";
     } else {
-      const standardState = (fileName.length + sec) % 4;
-      if (standardState === 0) prediction = "Up";
-      else if (standardState === 1) prediction = "Down";
-      else prediction = "Neutral";
+      const standardState = (fileName.length + sec) % 10;
+      if (standardState < 5) prediction = "Up";
+      else if (standardState < 9) prediction = "Down";
+      else prediction = "Neutral"; // Only 10% Neutral in Standard mode to ensure plenty of entries
     }
-    const confidence = prediction === "Neutral" ? (32 + (sec % 8)) : (75 + (sec % 15)); // 75%+ active sure-shot, lower for Neutral
+    const confidence = prediction === "Neutral" ? (32 + (sec % 8)) : (70 + (sec % 25)); // 70%+ active sure-shot, lower for Neutral
 
     const upEntry = formatPrice(basePrice + 0.00045);
     const downEntry = formatPrice(basePrice - 0.00045);
@@ -705,8 +711,8 @@ export default function App() {
       if (!limitCheck.allowed) {
         setErrorMsg(
           language === "bn"
-            ? "দুঃখিত! আপনি ২৪ ঘণ্টায় সর্বোচ্চ ২ টি ছবি অ্যানালাইসিস করার কোটা অতিক্রম করেছেন। দয়া করে আগামীকাল আবার চেষ্টা করুন।"
-            : "Sorry! You have exceeded the limit of 2 chart analyses per 24 hours. Please try again tomorrow."
+            ? "দুঃখিত! আপনি ২৪ ঘণ্টায় সর্বোচ্চ ৩ টি ছবি অ্যানালাইসিস করার কোটা অতিক্রম করেছেন। দয়া করে আগামীকাল আবার চেষ্টা করুন।"
+            : "Sorry! You have exceeded the limit of 3 chart analyses per 24 hours. Please try again tomorrow."
         );
         return;
       }
@@ -881,12 +887,11 @@ export default function App() {
 
   // Clear all items in history
   const handleClearAllHistory = () => {
-    if (confirm(language === "bn" ? "আপনি কি সম্পূর্ণ হিস্ট্রি মুছতে চান?" : "Are you sure you want to delete all analyzed charts?")) {
-      setHistory([]);
-      setActiveItem(null);
-      localStorage.removeItem("trading_analysis_history_v1");
-      setShowHistoryDrawer(false);
-    }
+    setHistory([]);
+    setActiveItem(null);
+    localStorage.removeItem("trading_analysis_history_v1");
+    setShowHistoryDrawer(false);
+    setShowClearHistoryConfirm(false);
   };
 
   // Cancel tentative image selection
@@ -1143,8 +1148,8 @@ export default function App() {
                               </span>
                             ) : (
                               language === "bn"
-                                ? `${limitInfo.remaining} টি বাকি (২০ টির মধ্যে)`
-                                : `${limitInfo.remaining} remaining (out of 20)`
+                                ? `${limitInfo.remaining} টি বাকি (৩ টির মধ্যে)`
+                                : `${limitInfo.remaining} remaining (out of 3)`
                             )}
                           </div>
                         </div>
@@ -1248,7 +1253,7 @@ export default function App() {
                     >
                       <Search className="w-5 h-5" />
                       {!isUserAdmin(currentUser) && checkAnalysisLimit(currentUser || "").remaining <= 0
-                        ? (language === "bn" ? "দৈনিক লিমিট শেষ (২০/২০)" : "Daily Limit Reached (20/20)")
+                        ? (language === "bn" ? "দৈনিক লিমিট শেষ (৩/৩)" : "Daily Limit Reached (3/3)")
                         : (language === "bn" ? "বিশ্লেষণ শুরু করুন" : "Start Analysis")}
                     </button>
                     <button
@@ -1298,6 +1303,63 @@ export default function App() {
                 /* Standard Uploader dashboard */
                 <div className="space-y-5 animate-fade-in">
                   
+                  {/* Signal Generation Mode Selector */}
+                  <div id="signal-mode-selector-widget" className="bg-[#111116] border-2 border-slate-800 rounded-3xl p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-white text-xs font-bold font-display flex items-center gap-1.5">
+                        <Sliders className="w-4 h-4 text-indigo-400" />
+                        {language === "bn" ? "সিগন্যাল মোড সিলেক্ট করুন:" : "Select Signal Mode:"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 bg-[#09090d] p-1 rounded-2xl border border-slate-800/80">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSignalPrecision("standard");
+                          try {
+                            localStorage.setItem("nila_signal_precision_v1", "standard");
+                          } catch (e) {}
+                          playSuccessChime();
+                        }}
+                        className={`py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          signalPrecision === "standard"
+                            ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                            : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        <TrendingUp className="w-3.5 h-3.5" />
+                        {language === "bn" ? "Standard (বেশি সিগন্যাল)" : "Standard (More Signals)"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSignalPrecision("sureshot");
+                          try {
+                            localStorage.setItem("nila_signal_precision_v1", "sureshot");
+                          } catch (e) {}
+                          playSuccessChime();
+                        }}
+                        className={`py-2 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                          signalPrecision === "sureshot"
+                            ? "bg-indigo-650 text-white shadow-md shadow-indigo-600/20 border border-indigo-500/20"
+                            : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-yellow-400 animate-pulse" />
+                        {language === "bn" ? "Sure Shot (খুব কম)" : "Sure Shot (Very Strict)"}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-relaxed text-left">
+                      {signalPrecision === "sureshot"
+                        ? (language === "bn" 
+                          ? "💡 Sure Shot মোডে এন্ট্রি অনেক কম পাওয়া যাবে কিন্তু সিগন্যালের মান ও একুরেসি অনেক বেশি থাকবে।" 
+                          : "💡 Sure Shot mode yields fewer entries but with much higher accuracy and confirmation levels.")
+                        : (language === "bn" 
+                          ? "💡 Standard মোডে ঘন ঘন বাই/সেল এন্ট্রি পাওয়া যাবে। মার্কেট যদি সাইডওয়ে থাকে তাও এন্ট্রি খুজে বের করবে।" 
+                          : "💡 Standard mode yields frequent buy/sell entries even in standard or sideways market conditions.")}
+                    </p>
+                  </div>
+
                   <UploadArea
                     onImageSelected={handleImageSelected}
                     language={language}
@@ -1595,14 +1657,38 @@ export default function App() {
 
               {/* Drawer bottoms */}
               {history.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleClearAllHistory}
-                  className="w-full bg-rose-950/30 hover:bg-rose-900/30 border-2 border-rose-500/30 text-rose-300 font-bold text-xs py-3 rounded-2xl tracking-wider uppercase transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  হিস্ট্রি ডাটা সম্পূর্ণ মুছুন
-                </button>
+                showClearHistoryConfirm ? (
+                  <div className="space-y-2 border border-rose-500/30 bg-rose-950/20 p-3 rounded-2xl animate-fade-in text-center">
+                    <p className="text-xs text-rose-300 font-bold leading-tight">
+                      {language === "bn" ? "আপনি কি নিশ্চিত সম্পূর্ণ হিস্ট্রি মুছতে চান?" : "Are you sure you want to delete all history?"}
+                    </p>
+                    <div className="flex gap-2 justify-center mt-1">
+                      <button
+                        type="button"
+                        onClick={handleClearAllHistory}
+                        className="bg-rose-600 hover:bg-rose-500 text-white font-black text-xs px-4 py-2 rounded-xl cursor-pointer active:scale-95 transition"
+                      >
+                        {language === "bn" ? "হ্যাঁ, মুছুন" : "Yes, clear"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowClearHistoryConfirm(false)}
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs px-4 py-2 rounded-xl cursor-pointer active:scale-95 transition"
+                      >
+                        {language === "bn" ? "না" : "Cancel"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowClearHistoryConfirm(true)}
+                    className="w-full bg-rose-950/30 hover:bg-rose-900/30 border-2 border-rose-500/30 text-rose-300 font-bold text-xs py-3 rounded-2xl tracking-wider uppercase transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    হিস্ট্রি ডাটা সম্পূর্ণ মুছুন
+                  </button>
+                )
               )}
 
             </div>

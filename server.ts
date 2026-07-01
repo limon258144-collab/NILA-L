@@ -61,27 +61,39 @@ app.post("/api/analyze", async (req, res): Promise<any> => {
     const ai = getGenAI();
 
     // Technical trading detailed prompt with very strict instructions to prevent trading losses
-    let promptText = `
-      You are an expert professional financial analyst, technical researcher, and chart pattern recognition system.
-      Analyze the attached trading chart image meticulously. Follow standard chart reading rules (candlestick structures, support/resistance, trend indicators, relative price volumes, price action levels).
-
-      CRITICAL CAPITAL PROTECTION & SURE-SHOT DIRECTIVE (৭৫%+ নিশ্চিত সিগন্যাল):
-      - ONLY predict "Up" or "Down" if there is at least a 75% or higher probability of success (৭৫%+ শিউর শট সম্ভাবনা).
-      - If you decide to predict "Up" or "Down", your confidence level MUST be between 75% to 100%. In both 'reasoningBangla' and 'recommendationBangla', you MUST write explicitly: "🔥 এই সিগন্যালে ৭৫% এর বেশি শিউর শট সম্ভাবনা রয়েছে" (This signal has an 75%+ sure shot probability).
-      - If you predict "Up", confidence MUST be between 75 to 100. Formulate recommendations explicitly with "৭৫%+ নিশ্চিত শিউর শট সিগন্যাল".
-      - If you predict "Down", confidence MUST be between 75 to 100. Formulate recommendations explicitly with "৭৫%+ নিশ্চিত শিউর শট সিগন্যাল".
-      - If the market has any high-risk setup, ranges, choppy patterns, or anything that is less than 75% sure, you MUST strictly set the prediction to "Neutral".
-      - For "Neutral" predictions, set confidence below 50. In the Bengali and English reasoning and recommendations, state very clearly "NO ENTRY (কোনো এন্ট্রি নিবেন না)" and warn that the market is too risky/unstable right now, and to preserve money. Set supportLevels and resistanceLevels to ["N/A"] so the user avoids triggering trades.
-    `;
+    let promptText = "";
 
     if (precision === "sureshot") {
-      promptText += `
-      
-      STRICT MAXIMUM PROTECTION ENFORCEMENT:
-      The user is operating in "🔥 100% SURE SHOTS ONLY" mode.
-      - Unless this chart displays a pristine, textbook-perfect, high-probability pattern bounce or breakout with absolute conviction, you MUST output "Neutral".
-      - Do NOT make any predictions of "Up" or "Down" for flat ranges, small candle sizes, weak volumes, mixed indicators, or any uncertain trend direction.
-      - Better to give "Neutral" than to risk a losing trade. 90% of tricky setups should be returned as "Neutral" in this mode to preserve capital.
+      promptText = `
+        You are an expert professional financial analyst, technical researcher, and chart pattern recognition system.
+        Analyze the attached trading chart image meticulously. Follow standard chart reading rules (candlestick structures, support/resistance, trend indicators, relative price volumes, price action levels).
+
+        CRITICAL CAPITAL PROTECTION & SURE-SHOT DIRECTIVE (৭০%+ নিশ্চিত সিগন্যাল):
+        - ONLY predict "Up" or "Down" if there is at least a 70% or higher probability of success (৭০%+ শিউর শট সম্ভাবনা).
+        - If you decide to predict "Up" or "Down", your confidence level MUST be between 70% to 100%. In both 'reasoningBangla' and 'recommendationBangla', you MUST write explicitly: "🔥 এই সিগন্যালে ৭০% এর বেশি শিউর শট সম্ভাবনা রয়েছে" (This signal has an 70%+ sure shot probability).
+        - If you predict "Up", confidence MUST be between 70 to 100. Formulate recommendations explicitly with "৭০%+ নিশ্চিত শিউর শট সিগন্যাল".
+        - If you predict "Down", confidence MUST be between 70 to 100. Formulate recommendations explicitly with "৭০%+ নিশ্চিত শিউর শট সিগন্যাল".
+        - If the market has any high-risk setup, ranges, choppy patterns, or anything that is less than 70% sure, you MUST strictly set the prediction to "Neutral".
+        - For "Neutral" predictions, set confidence below 50. In the Bengali and English reasoning and recommendations, state very clearly "NO ENTRY (কোনো এন্ট্রি নিবেন না)" and warn that the market is too risky/unstable right now, and to preserve money. Set supportLevels and resistanceLevels to ["N/A"] so the user avoids triggering trades.
+        
+        STRICT MAXIMUM PROTECTION ENFORCEMENT:
+        The user is operating in "🔥 100% SURE SHOTS ONLY" mode.
+        - Unless this chart displays a pristine, textbook-perfect, high-probability pattern bounce or breakout with absolute conviction, you MUST output "Neutral".
+        - Do NOT make any predictions of "Up" or "Down" for flat ranges, small candle sizes, weak volumes, mixed indicators, or any uncertain trend direction.
+        - Better to give "Neutral" than to risk a losing trade. 90% of tricky setups should be returned as "Neutral" in this mode to preserve capital.
+      `;
+    } else {
+      promptText = `
+        You are an expert professional financial analyst, technical researcher, and chart pattern recognition system.
+        Analyze the attached trading chart image meticulously. Follow standard chart reading rules (candlestick structures, support/resistance, trend indicators, relative price volumes, price action levels).
+
+        STANDARD TRADING MODE DIRECTIVE (বেশি ট্রেড এন্ট্রি এবং সিগন্যাল):
+        - The user is in "STANDARD" mode to get active Buy/Sell signals and frequent entries (বেশি এন্ট্রি সিগন্যাল).
+        - Therefore, do NOT be overly conservative or strict. Be active, predictive, and supportive!
+        - Carefully evaluate the overall trend, support/resistance zones, EMA indicators, and recent price action. Whenever there is a general bias, make a clear decision to predict either "Up" (Bullish/Call) or "Down" (Bearish/Put).
+        - Avoid predicting "Neutral" unless the chart is completely flat, unreadable, or shows absolutely zero movement.
+        - If you predict "Up" or "Down", set your confidence representing the setup strength (typically between 55% to 90%).
+        - In the Bengali 'reasoningBangla' and 'recommendationBangla', formulate actionable recommendations on how the user can enter the trade. Explain the trend simply so they can understand and trade.
       `;
     }
 
@@ -89,10 +101,10 @@ app.post("/api/analyze", async (req, res): Promise<any> => {
 
       Objectives:
       1. Carefully inspect recent candles and identify overall trend.
-      2. Provide a safe prediction of whether the NEXT CANDLE is "Up", "Down", or "Neutral" based on above strict safety rules (minimum 75% confidence required for active Up or Down).
+      2. Provide a prediction of whether the NEXT CANDLE is "Up", "Down", or "Neutral" based on above safety rules.
       3. Define trigger levels or relative zones for "Up" or "Down" inputs. If Neutral, set to "N/A".
       4. Detect support and resistance levels. If Neutral, set to ["N/A"].
-      5. Translate everything beautifully to Bengali (বাংলা) so technical Bengali traders can understand easily. Explain why it is an 75%+ SURE SHOT or why it is a NO ENTRY.
+      5. Translate everything beautifully to Bengali (বাংলা) so technical Bengali traders can understand easily. Explain why it is a trade setup or why it is a NO ENTRY.
       6. Provide SL and TP recommendation. If Neutral, set to "N/A".
 
       Provide your analysis strictly in valid JSON matching the requested response schema format. Do not prepend markdown formatting inside the json fields.

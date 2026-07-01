@@ -55,7 +55,15 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
 
   // Dynamically load registered user accounts from localStorage or fallbacks
   const getDynamicAccounts = () => {
-    let regs: Record<string, string> = {};
+    let regs: Record<string, string> = {
+      "limon258144@gmail.com": "limon000",
+      "admin@gmail.com": "admin123",
+      "korimanalice@gmail.com": "korim123",
+      "demo.trader@gmail.com": "demo123",
+      "safayet.trader@gmail.com": "safayet123",
+      "rashed.vip@gmail.com": "rashed123",
+      "tariq.bin.ziyad@gmail.com": "tariq123"
+    };
     try {
       const stored = localStorage.getItem("nila_registered_users_v2");
       if (stored) {
@@ -67,6 +75,10 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
     } catch (e) {
       console.error(e);
     }
+
+    // Enforce default passwords so they cannot be overridden by empty values or Google auth flags in localStorage
+    regs["limon258144@gmail.com"] = "limon000";
+    regs["admin@gmail.com"] = "admin123";
 
     const nameMap: Record<string, string> = {
       "limon258144@gmail.com": "Limon Ahmed",
@@ -180,7 +192,15 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
     }
 
     // Load actual users
-    let regs: Record<string, string> = {};
+    let regs: Record<string, string> = {
+      "limon258144@gmail.com": "limon000",
+      "admin@gmail.com": "admin123",
+      "korimanalice@gmail.com": "korim123",
+      "demo.trader@gmail.com": "demo123",
+      "safayet.trader@gmail.com": "safayet123",
+      "rashed.vip@gmail.com": "rashed123",
+      "tariq.bin.ziyad@gmail.com": "tariq123"
+    };
 
     try {
       const stored = localStorage.getItem("nila_registered_users_v2");
@@ -193,6 +213,10 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
     } catch (err) {
       console.error(err);
     }
+
+    // ALWAYS enforce Admin / hardcoded user password overrides so they cannot be overwritten by empty or "google-oauth" placeholders from stored state
+    regs["limon258144@gmail.com"] = "limon000";
+    regs["admin@gmail.com"] = "admin123";
 
     if (!regs[email]) {
       setErrorMsg(

@@ -2,6 +2,8 @@ import React, { useRef, useState } from "react";
 import { UploadCloud, Image as ImageIcon, Sparkles, TrendingUp, Clipboard } from "lucide-react";
 import { translations, Language } from "../utils/translations";
 import { sampleCharts } from "../utils/samples";
+// @ts-ignore
+import tradeLensLogo from "../assets/images/tradelens_logo_1782904706226.jpg";
 
 interface Props {
   onImageSelected: (dataUrl: string, fileName: string) => void;
@@ -15,6 +17,7 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
   const [isDragActive, setIsDragActive] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [pasteError, setPasteError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   // Client-side image resize and compression helper to reduce base64 footprint (extremely fast)
   const compressAndResizeImage = (dataUrl: string, callback: (compressed: string) => void) => {
@@ -55,9 +58,10 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
 
   const processFile = (file: File) => {
     if (!file.type.startsWith("image/")) {
-      alert("অনুগ্রহ করে একটি সঠিক ছবি (PNG, JPG, JPEG) আপলোড করুন।");
+      setLocalError(language === "bn" ? "অনুগ্রহ করে একটি সঠিক ছবি (PNG, JPG, JPEG) আপলোড করুন।" : "Please upload a valid image file (PNG, JPG, JPEG).");
       return;
     }
+    setLocalError(null);
     const reader = new FileReader();
     reader.onload = (e) => {
       if (e.target?.result && typeof e.target.result === "string") {
@@ -186,8 +190,18 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
           disabled={isAnalyzing}
         />
 
-        <div className="bg-[#18181e] p-4 rounded-full text-[#c084fc] group-hover:text-emerald-400 group-hover:bg-[#1f1e28] transition-all duration-300 mb-4 ring-8 ring-indigo-500/10">
-          <UploadCloud className="w-10 h-10 group-hover:scale-110 transition-transform duration-300" />
+        <div className="mb-4 relative">
+          <div className="bg-[#18181e] p-1.5 rounded-full ring-8 ring-indigo-500/10 overflow-hidden w-28 h-28 flex items-center justify-center border-2 border-slate-800 shadow-xl group-hover:border-indigo-500/50 transition-all duration-300">
+            <img 
+              src={tradeLensLogo} 
+              alt="TradeLens Logo" 
+              className="w-full h-full object-cover rounded-full group-hover:scale-105 transition-transform duration-300" 
+              referrerPolicy="no-referrer"
+            />
+          </div>
+          <div className="absolute -bottom-1 -right-1 bg-indigo-600 text-white p-1.5 rounded-full shadow-lg border border-indigo-400 group-hover:bg-emerald-500 group-hover:border-emerald-400 transition-colors duration-300">
+            <UploadCloud className="w-4 h-4" />
+          </div>
         </div>
 
         <h3 className="text-white font-display font-black text-base sm:text-lg mb-2">
@@ -196,6 +210,12 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
         <p className="text-xs text-slate-400 max-w-sm mb-1 font-medium">
           {t.uploadHelp}
         </p>
+
+        {localError && (
+          <p className="text-xs text-rose-400 max-w-sm mt-3 font-bold bg-rose-950/20 px-3 py-1.5 rounded-xl border border-rose-500/25 animate-bounce">
+            ⚠️ {localError}
+          </p>
+        )}
 
         {isDragActive && (
           <div className="absolute inset-0 bg-emerald-950/50 rounded-3xl border-3 border-emerald-500 flex items-center justify-center">
