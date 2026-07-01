@@ -38,7 +38,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
   const [adminAlertMsg, setAdminAlertMsg] = useState<string | null>(null);
 
   // App variables/settings form state
-  const [adminTelegram, setAdminTelegram] = useState("https://t.me/addmineanlice");
+  const [adminTelegram, setAdminTelegram] = useState("https://t.me/jayedbhai_12");
   const [adminOwner1, setAdminOwner1] = useState("nila\\ldp.onar");
   const [adminOwner2, setAdminOwner2] = useState("korim debolopar");
   const [adminWinRate, setAdminWinRate] = useState("98%");
@@ -66,7 +66,11 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
       }
 
       // 2. Load configurations
-      const storedTelegram = localStorage.getItem("nila_custom_telegram_v1");
+      let storedTelegram = localStorage.getItem("nila_custom_telegram_v1");
+      if (storedTelegram === "https://t.me/addmineanlice" || storedTelegram === "https://t.me/korimtrader_vip" || !storedTelegram) {
+        storedTelegram = "https://t.me/jayedbhai_12";
+        localStorage.setItem("nila_custom_telegram_v1", "https://t.me/jayedbhai_12");
+      }
       if (storedTelegram) setAdminTelegram(storedTelegram);
 
       const storedOwner1 = localStorage.getItem("nila_custom_owner1_v1");

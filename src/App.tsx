@@ -55,7 +55,7 @@ export default function App() {
   const [networkFilter, setNetworkFilter] = useState<"all" | "active">("all");
 
   // App configurations controlled dynamically by the admin
-  const [telegramLink, setTelegramLink] = useState("https://t.me/addmineanlice");
+  const [telegramLink, setTelegramLink] = useState("https://t.me/jayedbhai_12");
   const [globalAnnouncement, setGlobalAnnouncement] = useState("");
   const [analysisReloadKey, setAnalysisReloadKey] = useState(0);
 
@@ -89,7 +89,11 @@ export default function App() {
 
   const refreshCustomConfig = () => {
     try {
-      const storedTelegram = localStorage.getItem("nila_custom_telegram_v1");
+      let storedTelegram = localStorage.getItem("nila_custom_telegram_v1");
+      if (storedTelegram === "https://t.me/addmineanlice" || storedTelegram === "https://t.me/korimtrader_vip" || !storedTelegram) {
+        storedTelegram = "https://t.me/jayedbhai_12";
+        localStorage.setItem("nila_custom_telegram_v1", "https://t.me/jayedbhai_12");
+      }
       if (storedTelegram) setTelegramLink(storedTelegram);
 
       const storedAnnounce = localStorage.getItem("nila_custom_announcement_v1");
