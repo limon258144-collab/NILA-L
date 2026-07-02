@@ -9,9 +9,10 @@ interface Props {
   onImageSelected: (dataUrl: string, fileName: string) => void;
   language: Language;
   isAnalyzing: boolean;
+  isProUser?: boolean;
 }
 
-export default function UploadArea({ onImageSelected, language, isAnalyzing }: Props) {
+export default function UploadArea({ onImageSelected, language, isAnalyzing, isProUser = false }: Props) {
   const t = translations[language];
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragActive, setIsDragActive] = useState(false);
@@ -175,10 +176,12 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
         onDragLeave={handleDrag}
         onDrop={handleDrop}
         onClick={triggerInputClick}
-        className={`relative group bg-[#111116] border-3 border-dashed rounded-3xl p-6 md:p-8 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center min-h-[220px] ${
+        className={`relative group border-3 border-dashed rounded-3xl p-6 md:p-8 text-center cursor-pointer transition-all duration-500 flex flex-col items-center justify-center min-h-[220px] ${
           isDragActive
-            ? "border-emerald-500 bg-emerald-950/20 shadow-2xl shadow-emerald-500/20"
-            : "border-indigo-500/30 hover:border-indigo-500/65 hover:bg-[#141419]"
+            ? "border-emerald-500 bg-emerald-950/30 shadow-[0_0_35px_rgba(16,185,129,0.25)]"
+            : isProUser
+              ? "bg-[#16122d]/75 border-[#a855f7]/40 hover:border-[#a855f7]/85 hover:bg-[#1f1a42]/80 shadow-[0_0_25px_rgba(168,85,247,0.15)] backdrop-blur-md"
+              : "bg-[#111116] border-indigo-500/30 hover:border-indigo-500/65 hover:bg-[#141419]"
         } ${isAnalyzing ? "pointer-events-none opacity-50" : ""}`}
       >
         <input
@@ -191,7 +194,42 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
         />
 
         <div className="mb-4 relative">
-          <div className="bg-[#18181e] p-1.5 rounded-full ring-8 ring-indigo-500/10 overflow-hidden w-28 h-28 flex items-center justify-center border-2 border-slate-800 shadow-xl group-hover:border-indigo-500/50 transition-all duration-300">
+          {isProUser && (
+            <style>{`
+              @keyframes tennisBallBounce {
+                0%, 100% {
+                  transform: translateY(0) scale(1, 1);
+                }
+                25% {
+                  transform: translateY(-50px) scale(0.9, 1.1); /* Elastic stretch on ascent */
+                }
+                50% {
+                  transform: translateY(0) scale(1.05, 0.95); /* Ground hit */
+                }
+                54% {
+                  transform: translateY(0) scale(1.25, 0.75); /* Tennis squash impact */
+                }
+                58% {
+                  transform: translateY(0) scale(0.85, 1.15); /* Lift off stretch */
+                }
+                75% {
+                  transform: translateY(-18px) scale(0.95, 1.05); /* Small secondary bounce */
+                }
+                90% {
+                  transform: translateY(0) scale(1.02, 0.98); /* Settling down */
+                }
+              }
+              .tennis-ball-bounce {
+                animation: tennisBallBounce 1.6s cubic-bezier(0.25, 0.8, 0.25, 1) infinite;
+                transform-origin: bottom center;
+              }
+            `}</style>
+          )}
+          <div className={`p-1.5 rounded-full overflow-hidden w-28 h-28 flex items-center justify-center border-2 shadow-xl transition-all duration-300 ${
+            isProUser
+              ? "bg-[#1b1735] ring-8 ring-[#a855f7]/15 border-[#a855f7]/40 group-hover:border-[#a855f7]/90 group-hover:ring-[#a855f7]/25 tennis-ball-bounce"
+              : "bg-[#18181e] ring-8 ring-indigo-500/10 border-slate-800 group-hover:border-indigo-500/50"
+          }`}>
             <img 
               src={tradeLensLogo} 
               alt="TradeLens Logo" 
@@ -199,7 +237,11 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
               referrerPolicy="no-referrer"
             />
           </div>
-          <div className="absolute -bottom-1 -right-1 bg-indigo-600 text-white p-1.5 rounded-full shadow-lg border border-indigo-400 group-hover:bg-emerald-500 group-hover:border-emerald-400 transition-colors duration-300">
+          <div className={`absolute -bottom-1 -right-1 p-1.5 rounded-full shadow-lg border transition-colors duration-300 ${
+            isProUser
+              ? "bg-[#a855f7] border-[#d8b4fe] text-white group-hover:bg-emerald-500 group-hover:border-emerald-400"
+              : "bg-indigo-600 border-indigo-400 text-white group-hover:bg-emerald-500 group-hover:border-emerald-400"
+          }`}>
             <UploadCloud className="w-4 h-4" />
           </div>
         </div>
@@ -227,9 +269,16 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
       </div>
 
       {/* Touch-Friendly Clipboard / URL Paste Box */}
-      <div id="paste-input-card" className="bg-[#111116] border-2 border-slate-800 rounded-3xl p-5 space-y-4">
+      <div 
+        id="paste-input-card" 
+        className={`transition-all duration-500 border-2 rounded-3xl p-5 space-y-4 ${
+          isProUser
+            ? "bg-[#16122d]/75 border-[#a855f7]/40 shadow-[0_0_20px_rgba(168,85,247,0.12)] backdrop-blur-md"
+            : "bg-[#111116] border-slate-800"
+        }`}
+      >
         <h4 className="text-white font-display font-black text-sm flex items-center gap-2">
-          <Clipboard className="w-5 h-5 text-indigo-400" />
+          <Clipboard className={`w-5 h-5 ${isProUser ? "text-[#c084fc]" : "text-indigo-400"}`} />
           {t.pasteTitle}
         </h4>
         <div className="space-y-3">
@@ -240,7 +289,11 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
             onChange={handlePasteTextChange}
             onPaste={handlePasteInput}
             placeholder="স্ক্রিনশট কপি করে সরাসরি এখানে Ctrl+V চেপে পেস্ট করুন অথবা ইমেজ লিংক এখানে রাখুন..."
-            className="w-full bg-[#09090b] text-slate-100 placeholder-slate-500 border border-slate-800 focus:border-indigo-500/80 rounded-2xl p-3.5 text-xs font-sans outline-none focus:ring-2 focus:ring-indigo-500/30 transition-all resize-none font-bold"
+            className={`w-full text-slate-100 placeholder-slate-500 rounded-2xl p-3.5 text-xs font-sans outline-none focus:ring-2 transition-all resize-none font-bold ${
+              isProUser
+                ? "bg-[#0c0a18] border-[#a855f7]/30 focus:border-[#a855f7]/80 focus:ring-[#a855f7]/20"
+                : "bg-[#09090b] border-slate-800 focus:border-indigo-500/80 focus:ring-indigo-500/30"
+            }`}
             disabled={isAnalyzing}
           />
           {pasteError && (
@@ -253,9 +306,13 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
               id="load-paste-btn"
               onClick={loadPastedContent}
               disabled={isAnalyzing || !pasteText.trim()}
-              className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-550 disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold text-xs px-5 py-3 rounded-2xl transition duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-indigo-500/10 active:scale-95"
+              className={`w-full sm:w-auto disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold text-xs px-5 py-3 rounded-2xl transition duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 ${
+                isProUser
+                  ? "bg-[#a855f7] hover:bg-[#b876fc] shadow-[#a855f7]/10"
+                  : "bg-indigo-600 hover:bg-indigo-550 shadow-indigo-500/10"
+              }`}
             >
-              <Sparkles className="w-4 h-4 text-indigo-200" />
+              <Sparkles className={`w-4 h-4 ${isProUser ? "text-purple-200 animate-spin" : "text-indigo-200"}`} style={isProUser ? { animationDuration: "12s" } : undefined} />
               {t.pasteBtn}
             </button>
           </div>
@@ -263,9 +320,16 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
       </div>
 
       {/* Dynamic Demo Candlestick Patterns Picker */}
-      <div id="sample-picker-section" className="bg-[#111116] border-2 border-slate-800 rounded-3xl p-5">
+      <div 
+        id="sample-picker-section" 
+        className={`transition-all duration-500 border-2 rounded-3xl p-5 ${
+          isProUser
+            ? "bg-[#16122d]/75 border-[#a855f7]/40 shadow-[0_0_20px_rgba(168,85,247,0.12)] backdrop-blur-md"
+            : "bg-[#111116] border-slate-800"
+        }`}
+      >
         <h4 className="text-white font-display font-black text-sm mb-1 flex items-center gap-2">
-          <TrendingUp className="w-5 h-5 text-emerald-400" />
+          <TrendingUp className={`w-5 h-5 ${isProUser ? "text-emerald-450" : "text-emerald-450"}`} />
           {t.sampleCharts}
         </h4>
         <p className="text-xs text-slate-400 mb-4 font-medium">{t.sampleDesc}</p>
@@ -276,11 +340,17 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
               id={`sample-chart-btn-${sample.id}`}
               key={sample.id}
               onClick={() => onImageSelected(sample.dataUrl, `${sample.id}.png`)}
-              className="group text-left bg-slate-950 border border-slate-800 hover:border-indigo-500/50 rounded-2xl p-3 hover:bg-[#141419] transition-all duration-200 flex flex-col items-start gap-2 overflow-hidden active:scale-95"
+              className={`group text-left rounded-2xl p-3 transition-all duration-200 flex flex-col items-start gap-2 overflow-hidden active:scale-95 border ${
+                isProUser
+                  ? "bg-[#0c0a18] border-[#a855f7]/20 hover:border-[#a855f7]/70 hover:bg-[#1a1538]"
+                  : "bg-slate-950 border-slate-800 hover:border-indigo-500/50 hover:bg-[#141419]"
+              }`}
               title={t[sample.titleKey]}
               disabled={isAnalyzing}
             >
-              <div className="w-full bg-[#111114] rounded-xl overflow-hidden aspect-[16/9] border border-slate-850">
+              <div className={`w-full rounded-xl overflow-hidden aspect-[16/9] border ${
+                isProUser ? "bg-[#080710] border-[#a855f7]/15" : "bg-[#111114] border-slate-850"
+              }`}>
                 <img
                   src={sample.dataUrl}
                   alt={t[sample.titleKey]}
@@ -289,10 +359,14 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing }: P
                 />
               </div>
               <div className="w-full">
-                <p className="text-xs font-black text-slate-200 truncate group-hover:text-amber-400 transition-colors">
+                <p className={`text-xs font-black truncate transition-colors ${
+                  isProUser ? "text-[#e9d5ff] group-hover:text-amber-300" : "text-slate-200 group-hover:text-amber-400"
+                }`}>
                   {t[sample.titleKey]}
                 </p>
-                <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest font-bold">ডেমো চার্ট প্রস্তুত</span>
+                <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest font-bold block">
+                  {language === "bn" ? "ডেমো চার্ট প্রস্তুত" : "Demo Chart Ready"}
+                </span>
               </div>
             </button>
           ))}

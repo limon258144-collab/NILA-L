@@ -26,6 +26,7 @@ import {
 import { AnalysisHistoryItem, TradingAnalysis } from "./types";
 import { translations, Language } from "./utils/translations";
 import UploadArea from "./components/UploadArea";
+import RainEffect from "./components/RainEffect";
 import AnalysisResult from "./components/AnalysisResult";
 import LoginScreen from "./components/LoginScreen";
 import AdminPanel from "./components/AdminPanel";
@@ -352,7 +353,7 @@ export default function App() {
     );
   };
 
-  // Analysis rate limiting (Max 3 per day per user account, excluding master accounts)
+  // Analysis rate limiting (Max 3 tries in total ever after registration, excluding master accounts/PRO)
   const checkAnalysisLimit = (username: string): { allowed: boolean; remaining: number; count: number } => {
     if (isUserAdmin(username) || checkUserProStatus(username)) {
       return { allowed: true, remaining: 999, count: 0 };
@@ -363,10 +364,7 @@ export default function App() {
       const limits: Record<string, number[]> = JSON.parse(limitDataStr);
       
       const userTimestamps = limits[username] || [];
-      const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-      const activeTimestamps = userTimestamps.filter(t => t > oneDayAgo);
-      
-      const count = activeTimestamps.length;
+      const count = userTimestamps.length;
       const remaining = Math.max(0, 3 - count);
       return { allowed: remaining > 0, remaining, count };
     } catch (e) {
@@ -385,9 +383,8 @@ export default function App() {
       const userTimestamps = limits[username] || [];
       userTimestamps.push(Date.now());
       
-      // Keep only last 24 hours of logs to avoid infinite storage bloat
-      const oneDayAgo = Date.now() - 24 * 60 * 65 * 1000;
-      limits[username] = userTimestamps.filter(t => t > oneDayAgo);
+      // Keep all timestamps as it's a lifetime limit (max 3 items per user)
+      limits[username] = userTimestamps;
       
       localStorage.setItem("nila_analysis_limits_v1", JSON.stringify(limits));
       // Dispatch custom settings update event so limits reactively recalculate
@@ -715,8 +712,8 @@ export default function App() {
       if (!limitCheck.allowed) {
         setErrorMsg(
           language === "bn"
-            ? "দুঃখিত! আপনি ২৪ ঘণ্টায় সর্বোচ্চ ৩ টি ছবি অ্যানালাইসিস করার কোটা অতিক্রম করেছেন। দয়া করে আগামীকাল আবার চেষ্টা করুন।"
-            : "Sorry! You have exceeded the limit of 3 chart analyses per 24 hours. Please try again tomorrow."
+            ? "দুঃখিত! আপনার ৩ টি ফ্রি ট্রায়াল লিমিট শেষ হয়ে গেছে। আরও সিগন্যাল পেতে প্রো মেম্বারশিপ একটিভ করুন।"
+            : "Sorry! Your limit of 3 free trial analyses has been exhausted. To continue, please activate PRO membership."
         );
         return;
       }
@@ -908,9 +905,18 @@ export default function App() {
     }
   };
 
+  const isProUser = checkUserProStatus(currentUser);
+
   return (
     <div className="min-h-screen bg-[#060608] text-slate-100 flex flex-col justify-center items-center p-0 md:p-6 lg:p-10 relative overflow-x-hidden font-sans">
       
+      {/* Large luxury background branding watermark */}
+      <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none z-0 select-none">
+        <div className="text-[12vw] font-black tracking-[0.18em] text-slate-900/40 uppercase pointer-events-none select-none text-center transform -rotate-6 transition-all duration-1000 select-none font-display leading-none">
+          Trade Lens
+        </div>
+      </div>
+
       {/* Decorative desktop ambient light source */}
       <div className="absolute top-0 left-1/4 w-[40rem] h-[40rem] rounded-full bg-indigo-500/10 blur-3xl pointer-events-none hidden md:block" />
       <div className="absolute bottom-0 right-1/4 w-[40rem] h-[40rem] rounded-full bg-purple-500/10 blur-3xl pointer-events-none hidden md:block" />
@@ -918,7 +924,11 @@ export default function App() {
       {/* Main Responsive Layout Wrapper: Mobile-first simulated phone chassis for desktop screens */}
       <div 
         id="applet-viewport-frame"
-        className="w-full md:max-w-[480px] min-h-screen md:min-h-[880px] md:max-h-[920px] bg-[#0b0c10] md:rounded-[44px] md:border-8 md:border-[#1d2230] md:shadow-[0_0_80px_20px_rgba(99,102,241,0.15)] flex flex-col overflow-hidden relative"
+        className={`w-full md:max-w-[480px] min-h-screen md:min-h-[880px] md:max-h-[920px] bg-[#0b0c10] md:rounded-[44px] md:border-8 flex flex-col overflow-hidden relative transition-all duration-700 ${
+          isProUser 
+            ? "md:border-[#a855f7]/80 md:shadow-[0_0_100px_35px_rgba(168,85,247,0.25)]" 
+            : "md:border-[#1d2230] md:shadow-[0_0_80px_20px_rgba(99,102,241,0.15)]"
+        }`}
       >
         
         {/* Simulated Smartphone Bezel Notch & Top Speaker (Visual craftsmanship for 'phoner moto' requested design) */}
@@ -959,7 +969,7 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-sm font-black font-display text-white tracking-tight flex items-center gap-1">
-                {language === "bn" ? "নীলা ট্রেডার/L" : "NILA TRADER/L"}
+                Trade Lens
                 <span className="text-[8px] font-mono bg-indigo-505/10 text-indigo-400 px-1 py-0.5 border border-indigo-500/20 rounded">
                   PRO
                 </span>
@@ -1034,7 +1044,13 @@ export default function App() {
         </header>
 
         {/* Mock App Inner Canvas Scroll container - Touch scroll mimicking real phone feel */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#07070a] p-4 space-y-6 pb-24 relative z-30">
+        <div className={`flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6 pb-24 relative z-30 transition-all duration-500 ${
+          isProUser 
+            ? "bg-gradient-to-b from-[#0e0a1f] via-[#080814] to-[#0d071a]" 
+            : "bg-[#07070a]"
+        }`}>
+          
+          {isProUser && <RainEffect />}
           
           {!currentUser ? (
             <LoginScreen 
@@ -1135,8 +1151,8 @@ export default function App() {
                               <Sparkles className={`w-3.5 h-3.5 ${limitInfo.remaining === 0 ? "text-rose-450" : "text-indigo-400 animate-pulse"}`} />
                               <span className="font-semibold select-none text-[11px] sm:text-xs">
                                 {language === "bn"
-                                  ? "অ্যানালাইসিস দৈনিক লিমিট:"
-                                  : "Daily Analysis Limit:"}
+                                  ? "ফ্রি ট্রায়াল লিমিট:"
+                                  : "Free Trial Limit:"}
                               </span>
                             </div>
                             <span className="text-[10px] text-indigo-400 font-bold select-none block mt-0.5">
@@ -1257,7 +1273,7 @@ export default function App() {
                     >
                       <Search className="w-5 h-5" />
                       {!isUserAdmin(currentUser) && checkAnalysisLimit(currentUser || "").remaining <= 0
-                        ? (language === "bn" ? "দৈনিক লিমিট শেষ (৩/৩)" : "Daily Limit Reached (3/3)")
+                        ? (language === "bn" ? "ফ্রি লিমিট শেষ (৩/৩)" : "Free Limit Reached (3/3)")
                         : (language === "bn" ? "বিশ্লেষণ শুরু করুন" : "Start Analysis")}
                     </button>
                     <button
@@ -1308,12 +1324,24 @@ export default function App() {
                 <div className="space-y-5 animate-fade-in">
                   
                   {/* Signal Generation Mode Selector */}
-                  <div id="signal-mode-selector-widget" className="bg-[#111116] border-2 border-slate-800 rounded-3xl p-3.5 space-y-2.5">
+                  <div 
+                    id="signal-mode-selector-widget" 
+                    className={`transition-all duration-500 rounded-3xl p-3.5 space-y-2.5 border-2 ${
+                      isProUser 
+                        ? "bg-[#16122d]/75 border-[#a855f7]/40 shadow-[0_0_20px_rgba(168,85,247,0.12)] backdrop-blur-md" 
+                        : "bg-[#111116] border-slate-800"
+                    }`}
+                  >
                     <div className="flex items-center justify-between">
                       <span className="text-white text-xs font-bold font-display flex items-center gap-1.5">
-                        <Sliders className="w-4 h-4 text-indigo-400" />
+                        <Sliders className={`w-4 h-4 ${isProUser ? "text-[#c084fc] animate-pulse" : "text-indigo-400"}`} />
                         {language === "bn" ? "সিগন্যাল মোড সিলেক্ট করুন:" : "Select Signal Mode:"}
                       </span>
+                      {isProUser && (
+                        <span className="text-[9px] font-black uppercase tracking-widest text-[#d8b4fe] bg-[#a855f7]/25 px-2 py-0.5 rounded border border-[#a855f7]/40 animate-pulse select-none">
+                          vip secure
+                        </span>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-2 bg-[#09090d] p-1 rounded-2xl border border-slate-800/80">
                       <button
@@ -1368,6 +1396,7 @@ export default function App() {
                     onImageSelected={handleImageSelected}
                     language={language}
                     isAnalyzing={isAnalyzing}
+                    isProUser={isProUser}
                   />
 
                 </div>
