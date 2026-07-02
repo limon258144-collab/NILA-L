@@ -4,7 +4,8 @@ import {
   ArrowDownCircle, 
   HelpCircle,
   Activity,
-  Compass
+  Compass,
+  Ban
 } from "lucide-react";
 import { TradingAnalysis } from "../types";
 
@@ -18,6 +19,7 @@ interface Props {
 export default function AnalysisResult({ analysis = {} as TradingAnalysis, language, imageFileName, imageDataUrl }: Props) {
   const isUp = analysis?.prediction?.toLowerCase() === "up";
   const isDown = analysis?.prediction?.toLowerCase() === "down";
+  const isNotChart = analysis?.prediction?.toLowerCase() === "not_a_chart";
 
   const [telegram, setTelegram] = React.useState("https://t.me/poketbrokar");
   const [owner1, setOwner1] = React.useState("nila\\ldp.onar");
@@ -47,7 +49,12 @@ export default function AnalysisResult({ analysis = {} as TradingAnalysis, langu
   let predictionLabel = "NO ENTRY (কোনো এন্ট্রি নিবেন না - মার্কেট ঝুঁকিপূর্ণ)";
   let PredictionIcon = HelpCircle;
 
-  if (isUp) {
+  if (isNotChart) {
+    predictionBg = "bg-[#251213]/95 border-rose-500/40 shadow-[0_0_30px_rgba(244,63,94,0.15)]";
+    predictionText = "text-rose-400 drop-shadow-[0_0_15px_rgba(244,63,94,0.45)]";
+    predictionLabel = "NO ENTRY (কোনো এন্ট্রি নেই - এটি ট্রেডিং চার্ট নয়!)";
+    PredictionIcon = Ban;
+  } else if (isUp) {
     predictionBg = "bg-[#131d1a]/95 border-emerald-500/40";
     predictionText = "text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.4)]";
     predictionLabel = "🔥 SURE SHOT • UP / কল ট্রেড (বাই)";
@@ -145,12 +152,21 @@ export default function AnalysisResult({ analysis = {} as TradingAnalysis, langu
           )}
 
           {(!supportLevels || supportLevels[0] === "N/A") && (!resistanceLevels || resistanceLevels[0] === "N/A") && (
-            <div className="bg-[#18110b] border border-amber-500/30 rounded-xl p-4 space-y-2 text-center">
-              <span className="text-amber-500 font-black text-xs sm:text-sm block">⚠️ NO ENTRY (ট্রেড করা থেকে বিরত থাকুন) ⚠️</span>
+            <div className={`border rounded-xl p-4 space-y-2 text-center ${isNotChart ? "bg-rose-950/10 border-rose-500/30" : "bg-[#18110b] border-amber-500/30"}`}>
+              <span className={`font-black text-xs sm:text-sm block ${isNotChart ? "text-rose-450" : "text-amber-500"}`}>
+                {isNotChart 
+                  ? "❌ NO ENTRY (এটি ট্রেডিং চার্ট নয়) ❌" 
+                  : "⚠️ NO ENTRY (ট্রেড করা থেকে বিরত থাকুন) ⚠️"}
+              </span>
               <p className="text-slate-350 text-xs leading-relaxed">
-                {language === "bn"
-                  ? "মার্কেট বর্তমানে চরম অনির্দিষ্ট এবং ঝুঁকিপূর্ণ অবস্থায় রয়েছে। কোনো স্পট বা রিলায়েবল ক্যান্ডেলস্টিক বাউন্স পাওয়া যায়নি। ভুল এন্ট্রি নিয়ে লোকসান এড়াতে এই ক্যান্ডেলে কোনো ট্রেড নিবেন না। অনুগ্রহ করে পরবর্তী ১০০% সিওর শট সিগন্যালের জন্য অপেক্ষা করুন।"
-                  : "The market setup is highly volatile and lacks clear directional movement. Empty or choppy parameters detected. Please do not take any entries now to safeguard your capital. Wait for a clear 100% SURE SHOT confirmation."}
+                {isNotChart
+                  ? (language === "bn"
+                      ? "আপনার আপলোডকৃত ফাইলটি একটি সাধারণ ছবি এবং এটি কোনো সঠিক ট্রেডিং চার্ট স্ক্রিনশট নয়। কোনো ভুল এন্ট্রি যাতে না নেওয়া হয় সে জন্য এই সিগন্যালটিকে ব্লক করা হয়েছে। অনুগ্রহ করে একটি সঠিক ক্যান্ডেলস্টিক চার্ট আপলোড করুন।"
+                      : "The uploaded file is not a valid trading chart screen or market graph. To prevent any incorrect entries, this signal decision has been blocked. Please upload a proper candlestick chart.")
+                  : (language === "bn"
+                      ? "মার্কেট বর্তমানে চরম অনির্দিষ্ট এবং ঝুঁকিপূর্ণ অবস্থায় রয়েছে। কোনো স্পট বা রিলায়েবল ক্যান্ডেলস্টিক বাউন্স পাওয়া যায়নি। ভুল এন্ট্রি নিয়ে লোকসান এড়াতে এই ক্যান্ডেলে কোনো ট্রেড নিবেন না। অনুগ্রহ করে পরবর্তী ১০০% সিওর শট সিগন্যালের জন্য অপেক্ষা করুন।"
+                      : "The market setup is highly volatile and lacks clear directional movement. Empty or choppy parameters detected. Please do not take any entries now to safeguard your capital. Wait for a clear 100% SURE SHOT confirmation.")
+                }
               </p>
             </div>
           )}

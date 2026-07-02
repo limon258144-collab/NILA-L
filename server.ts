@@ -60,11 +60,29 @@ app.post("/api/analyze", async (req, res): Promise<any> => {
 
     const ai = getGenAI();
 
-    // Technical trading detailed prompt with very strict instructions to prevent trading losses
-    let promptText = "";
+    // Technical trading detailed prompt with very strict instructions to prevent trading losses and validate if it is a trading chart
+    let promptText = `
+      CRITICAL VALIDATION STEP:
+      First, inspect if the uploaded image is indeed a valid financial trading chart, candlestick chart, market asset graph, or trading platform screenshot (e.g., MetaTrader, IQ Option, TradingView, Pocket Option, Binance, line/bar/candle chart, etc.).
+      If the image is NOT a trading chart (for example, if it is a photo of a person, a selfie, a household object, random text, animals, scenery, documents, memes, or anything other than a financial market graph/chart), you MUST strictly set:
+      - 'prediction' to "NOT_A_CHART"
+      - 'confidence' to 0
+      - 'supportLevels' to ["N/A"]
+      - 'resistanceLevels' to ["N/A"]
+      - 'patternsIdentified' to ["Invalid Image / Not a Chart"]
+      - 'reasoning' to "The uploaded image is not a recognized trading chart or candlestick graph. Please upload a valid trading chart screenshot."
+      - 'reasoningBangla' to "আপলোডকৃত ছবিটি কোনো ট্রেডিং চার্ট বা ক্যান্ডেলস্টিক গ্রাফ নয়। অনুগ্রহ করে আপনার পছন্দের ট্রেডিং প্ল্যাটফর্মের সঠিক চার্টের স্ক্রিনশট আপলোড করুন।"
+      - 'recommendation' to "NO ENTRY (NOT A TRADING CHART)"
+      - 'recommendationBangla' to "কোনো এন্ট্রি নেই (ট্রেডিং চার্ট নয়)। সঠিক ফাইন্যান্সিয়াল চার্ট আপলোড করা হলে এখানে সিগন্যাল সিদ্ধান্ত প্রদর্শিত হবে।"
+      - 'riskRewardRatio' to "N/A"
+      - 'suggestedStopLoss' to "N/A"
+      - 'suggestedTakeProfit' to "N/A"
+
+      Only if the image is a valid trading chart, proceed with the following detailed technical analysis instructions.
+    `;
 
     if (precision === "sureshot") {
-      promptText = `
+      promptText += `
         You are an expert professional financial analyst, technical researcher, and chart pattern recognition system.
         Analyze the attached trading chart image meticulously. Follow standard chart reading rules (candlestick structures, support/resistance, trend indicators, relative price volumes, price action levels).
 
@@ -83,7 +101,7 @@ app.post("/api/analyze", async (req, res): Promise<any> => {
         - Better to give "Neutral" than to risk a losing trade. 90% of tricky setups should be returned as "Neutral" in this mode to preserve capital.
       `;
     } else {
-      promptText = `
+      promptText += `
         You are an expert professional financial analyst, technical researcher, and chart pattern recognition system.
         Analyze the attached trading chart image meticulously. Follow standard chart reading rules (candlestick structures, support/resistance, trend indicators, relative price volumes, price action levels).
 
@@ -101,11 +119,11 @@ app.post("/api/analyze", async (req, res): Promise<any> => {
 
       Objectives:
       1. Carefully inspect recent candles and identify overall trend.
-      2. Provide a prediction of whether the NEXT CANDLE is "Up", "Down", or "Neutral" based on above safety rules.
-      3. Define trigger levels or relative zones for "Up" or "Down" inputs. If Neutral, set to "N/A".
-      4. Detect support and resistance levels. If Neutral, set to ["N/A"].
+      2. Provide a prediction of whether the NEXT CANDLE is "Up", "Down", or "Neutral" based on above safety rules. If the image is not a trading chart, return "NOT_A_CHART".
+      3. Define trigger levels or relative zones for "Up" or "Down" inputs. If Neutral or NOT_A_CHART, set to "N/A".
+      4. Detect support and resistance levels. If Neutral or NOT_A_CHART, set to ["N/A"].
       5. Translate everything beautifully to Bengali (বাংলা) so technical Bengali traders can understand easily. Explain why it is a trade setup or why it is a NO ENTRY.
-      6. Provide SL and TP recommendation. If Neutral, set to "N/A".
+      6. Provide SL and TP recommendation. If Neutral or NOT_A_CHART, set to "N/A".
 
       Provide your analysis strictly in valid JSON matching the requested response schema format. Do not prepend markdown formatting inside the json fields.
     `;
@@ -138,7 +156,7 @@ app.post("/api/analyze", async (req, res): Promise<any> => {
               properties: {
                 prediction: {
                   type: Type.STRING,
-                  description: "Predicted direction of the next candle: 'Up' (Bullish/Call), 'Down' (Bearish/Put), or 'Neutral'."
+                  description: "Predicted direction of the next candle: 'Up' (Bullish/Call), 'Down' (Bearish/Put), 'Neutral', or 'NOT_A_CHART' (if the uploaded image is not a trading chart)."
                 },
                 priceCloseUpEntry: {
                   type: Type.STRING,
