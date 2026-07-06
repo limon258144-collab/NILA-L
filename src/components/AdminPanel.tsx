@@ -336,11 +336,39 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
     }
   };
 
+  const trackDeletedUser = (username: string) => {
+    if (!username) return;
+    try {
+      const deletedUsers = JSON.parse(localStorage.getItem("nila_deleted_users_v1") || "[]");
+      if (!deletedUsers.includes(username)) {
+        deletedUsers.push(username);
+        localStorage.setItem("nila_deleted_users_v1", JSON.stringify(deletedUsers));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const trackDeletedPayment = (payId: string) => {
+    if (!payId) return;
+    try {
+      const deletedPayments = JSON.parse(localStorage.getItem("nila_deleted_payments_v1") || "[]");
+      if (!deletedPayments.includes(payId)) {
+        deletedPayments.push(payId);
+        localStorage.setItem("nila_deleted_payments_v1", JSON.stringify(deletedPayments));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleDeletePayment = (payId: string) => {
+    trackDeletedPayment(payId);
     const pay = submittedPayments.find(p => p.id === payId);
     if (pay) {
       const username = pay.username;
       if (username && username !== "admin" && username !== "00000000000" && username !== "limon258144@gmail.com") {
+        trackDeletedUser(username);
         try {
           // Delete from registered users list
           const storedUsers = JSON.parse(localStorage.getItem("nila_registered_users_v2") || "{}");
@@ -372,6 +400,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
     const updated = submittedPayments.filter(p => p.id !== payId);
     localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(updated));
     window.dispatchEvent(new Event("nila_settings_updated"));
+    syncWithServer();
     showToast("রেকর্ড এবং ইউজার অ্যাকাউন্ট সম্পূর্ণ মুছে ফেলা হয়েছে।");
   };
 
@@ -396,6 +425,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
   };
 
   const handleDeleteUser = (username: string) => {
+    trackDeletedUser(username);
     const updated = { ...users };
     delete updated[username];
     localStorage.setItem("nila_registered_users_v2", JSON.stringify(updated));
@@ -557,10 +587,16 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
   const handleBulkDeletePayments = () => {
     if (selectedPaymentIds.length === 0) return;
     
+    // Track deleted payment IDs
+    selectedPaymentIds.forEach(id => trackDeletedPayment(id));
+
     const usernamesToDelete = submittedPayments
       .filter(p => selectedPaymentIds.includes(p.id))
       .map(p => p.username)
       .filter(un => un && un !== "admin" && un !== "00000000000" && un !== "limon258144@gmail.com");
+
+    // Track deleted usernames
+    usernamesToDelete.forEach(username => trackDeletedUser(username));
 
     try {
       // 1. Delete from registered users list
@@ -597,6 +633,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
     localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(updated));
     setSelectedPaymentIds([]);
     window.dispatchEvent(new Event("nila_settings_updated"));
+    syncWithServer();
     showToast("রেকর্ড এবং ইউজার অ্যাকাউন্টসমূহ সম্পূর্ণ মুছে ফেলা হয়েছে।");
   };
 

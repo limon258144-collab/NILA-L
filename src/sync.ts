@@ -19,6 +19,8 @@ export async function syncWithServer() {
     const supportChats = JSON.parse(localStorage.getItem("nila_support_chats_v2") || "{}");
     const analysisLimits = JSON.parse(localStorage.getItem("nila_analysis_limits_v1") || "{}");
     const proUsers = JSON.parse(localStorage.getItem("nila_pro_users_v1") || "[]");
+    const deletedPayments = JSON.parse(localStorage.getItem("nila_deleted_payments_v1") || "[]");
+    const deletedUsers = JSON.parse(localStorage.getItem("nila_deleted_users_v1") || "[]");
 
     const configs: Record<string, string> = {};
     for (const key of CONFIG_KEYS) {
@@ -39,6 +41,8 @@ export async function syncWithServer() {
         analysisLimits,
         proUsers,
         configs,
+        deletedPayments,
+        deletedUsers,
       }),
     });
 
@@ -51,12 +55,39 @@ export async function syncWithServer() {
 
     const state = data.state;
 
-    localStorage.setItem("nila_registered_users_v2", JSON.stringify(state.registeredUsers || {}));
-    localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(state.submittedPayments || []));
-    localStorage.setItem("nila_active_sessions_v1", JSON.stringify(state.activeSessions || {}));
+    const serverDeletedPayments: string[] = state.deletedPayments || [];
+    const serverDeletedUsers: string[] = state.deletedUsers || [];
+
+    // Filter state items using the merged deleted lists
+    const filteredRegisteredUsers = { ...(state.registeredUsers || {}) };
+    serverDeletedUsers.forEach(un => {
+      delete filteredRegisteredUsers[un];
+    });
+
+    const filteredActiveSessions = { ...(state.activeSessions || {}) };
+    serverDeletedUsers.forEach(un => {
+      delete filteredActiveSessions[un];
+    });
+
+    const filteredProUsers = (state.proUsers || []).filter((e: any) => {
+      const name = typeof e === "string" ? e : e?.username;
+      return name && !serverDeletedUsers.includes(name);
+    });
+
+    const filteredSubmittedPayments = (state.submittedPayments || []).filter((p: any) => {
+      return p && p.id && !serverDeletedPayments.includes(p.id) && !serverDeletedUsers.includes(p.username);
+    });
+
+    // Save back to local storage
+    localStorage.setItem("nila_deleted_payments_v1", JSON.stringify(serverDeletedPayments));
+    localStorage.setItem("nila_deleted_users_v1", JSON.stringify(serverDeletedUsers));
+
+    localStorage.setItem("nila_registered_users_v2", JSON.stringify(filteredRegisteredUsers));
+    localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(filteredSubmittedPayments));
+    localStorage.setItem("nila_active_sessions_v1", JSON.stringify(filteredActiveSessions));
     localStorage.setItem("nila_support_chats_v2", JSON.stringify(state.supportChats || {}));
     localStorage.setItem("nila_analysis_limits_v1", JSON.stringify(state.analysisLimits || {}));
-    localStorage.setItem("nila_pro_users_v1", JSON.stringify(state.proUsers || []));
+    localStorage.setItem("nila_pro_users_v1", JSON.stringify(filteredProUsers));
 
     if (state.configs) {
       for (const [key, val] of Object.entries(state.configs)) {

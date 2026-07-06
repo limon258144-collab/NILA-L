@@ -2008,7 +2008,7 @@ export default function App() {
                       (2500 tk)
                     </span>
                     <span className="text-slate-500 font-mono text-[9px] block">
-                      / 26 Days
+                      / 30 Days
                     </span>
                   </div>
                   <button

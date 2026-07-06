@@ -30,6 +30,8 @@ interface DbState {
   supportChats: Record<string, any>;
   analysisLimits: Record<string, any>;
   configs: Record<string, string>;
+  deletedPayments?: string[];
+  deletedUsers?: string[];
 }
 
 function readDb(): DbState {
@@ -37,10 +39,14 @@ function readDb(): DbState {
     if (fs.existsSync(DB_PATH)) {
       const content = fs.readFileSync(DB_PATH, "utf-8");
       const db = JSON.parse(content) as DbState;
-      if (db && Array.isArray(db.submittedPayments)) {
-        db.submittedPayments = db.submittedPayments.filter((p: any) => {
-          return p && p.id && p.id.length > 12 && p.id.split("_").length >= 3;
-        });
+      if (db) {
+        if (!db.deletedPayments) db.deletedPayments = [];
+        if (!db.deletedUsers) db.deletedUsers = [];
+        if (Array.isArray(db.submittedPayments)) {
+          db.submittedPayments = db.submittedPayments.filter((p: any) => {
+            return p && p.id && p.id.length > 12 && p.id.split("_").length >= 3;
+          });
+        }
       }
       return db;
     }
@@ -55,6 +61,8 @@ function readDb(): DbState {
     supportChats: {},
     analysisLimits: {},
     configs: {},
+    deletedPayments: [],
+    deletedUsers: [],
   };
 }
 
@@ -102,9 +110,25 @@ app.post("/api/db/sync", (req, res) => {
     const payload = req.body || {};
     const db = readDb();
 
+    // 0. Merge and keep deletion lists
+    const incomingDeletedPayments = payload.deletedPayments && Array.isArray(payload.deletedPayments) ? payload.deletedPayments : [];
+    const incomingDeletedUsers = payload.deletedUsers && Array.isArray(payload.deletedUsers) ? payload.deletedUsers : [];
+
+    const existingDeletedPayments = db.deletedPayments || [];
+    const existingDeletedUsers = db.deletedUsers || [];
+
+    const mergedDeletedPayments = Array.from(new Set([...existingDeletedPayments, ...incomingDeletedPayments]));
+    const mergedDeletedUsers = Array.from(new Set([...existingDeletedUsers, ...incomingDeletedUsers]));
+
+    db.deletedPayments = mergedDeletedPayments;
+    db.deletedUsers = mergedDeletedUsers;
+
     // 1. Merge registeredUsers
     if (payload.registeredUsers) {
       db.registeredUsers = { ...db.registeredUsers, ...payload.registeredUsers };
+    }
+    for (const un of mergedDeletedUsers) {
+      delete db.registeredUsers[un];
     }
 
     // 2. Merge activeSessions
@@ -115,6 +139,9 @@ app.post("/api/db/sync", (req, res) => {
           db.activeSessions[username] = timestamp as number;
         }
       }
+    }
+    for (const un of mergedDeletedUsers) {
+      delete db.activeSessions[un];
     }
 
     // 3. Merge proUsers
@@ -133,6 +160,9 @@ app.post("/api/db/sync", (req, res) => {
             proMap.set(key, p);
           }
         }
+      }
+      for (const un of mergedDeletedUsers) {
+        proMap.delete(un.toLowerCase());
       }
       db.proUsers = Array.from(proMap.values());
     }
@@ -163,8 +193,11 @@ app.post("/api/db/sync", (req, res) => {
           }
         }
       }
+      for (const pId of mergedDeletedPayments) {
+        paymentMap.delete(pId);
+      }
       db.submittedPayments = Array.from(paymentMap.values()).filter((p: any) => {
-        return p && p.id && p.id.length > 12 && p.id.split("_").length >= 3;
+        return p && p.id && p.id.length > 12 && p.id.split("_").length >= 3 && !mergedDeletedUsers.includes(p.username);
       });
     }
 
