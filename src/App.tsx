@@ -513,7 +513,7 @@ export default function App() {
 
   // Update clock & battery animations to make UI highly alive
   useEffect(() => {
-    document.title = "নীলা ট্রেডার/L dp";
+    document.title = "Trade.Lens";
     const updateTime = () => {
       const now = new Date();
       let hours = now.getHours();
