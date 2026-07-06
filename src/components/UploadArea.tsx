@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { UploadCloud, Image as ImageIcon, Sparkles, TrendingUp, Clipboard } from "lucide-react";
+import { UploadCloud, Image as ImageIcon, Sparkles, TrendingUp } from "lucide-react";
 import { translations, Language } from "../utils/translations";
 import { sampleCharts } from "../utils/samples";
 // @ts-ignore
@@ -16,8 +16,6 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing, isP
   const t = translations[language];
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragActive, setIsDragActive] = useState(false);
-  const [pasteText, setPasteText] = useState("");
-  const [pasteError, setPasteError] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
 
   // Client-side image resize and compression helper to reduce base64 footprint (extremely fast)
@@ -106,65 +104,7 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing, isP
     }
   };
 
-  const handlePasteInput = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const items = e.clipboardData?.items;
-    if (items) {
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].type.indexOf("image") !== -1) {
-          const blob = items[i].getAsFile();
-          if (blob) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-              if (event.target?.result && typeof event.target.result === "string") {
-                compressAndResizeImage(event.target.result, (compressedData) => {
-                  onImageSelected(compressedData, "clipboard-pasted-chart.png");
-                  setPasteError(null);
-                  setPasteText("");
-                });
-              }
-            };
-            reader.readAsDataURL(blob);
-            e.preventDefault();
-            return;
-          }
-        }
-      }
-    }
-  };
 
-  const handlePasteTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    setPasteText(value);
-    setPasteError(null);
-
-    const trimmed = value.trim();
-    if (trimmed.startsWith("data:image/") && trimmed.includes(";base64,")) {
-      compressAndResizeImage(trimmed, (compressedData) => {
-        onImageSelected(compressedData, "base64-instant-load.png");
-        setPasteText("");
-        setPasteError(null);
-      });
-    }
-  };
-
-  const loadPastedContent = () => {
-    const trimmed = pasteText.trim();
-    if (!trimmed) return;
-
-    if (trimmed.startsWith("data:image/")) {
-      compressAndResizeImage(trimmed, (compressedData) => {
-        onImageSelected(compressedData, "base64-pasted-chart.png");
-        setPasteText("");
-        setPasteError(null);
-      });
-    } else if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-      onImageSelected(trimmed, "url-pasted-chart.png");
-      setPasteText("");
-      setPasteError(null);
-    } else {
-      setPasteError(t.pasteInvalid);
-    }
-  };
 
   return (
     <div id="chart-upload-container" className="space-y-6">
@@ -268,56 +208,7 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing, isP
         )}
       </div>
 
-      {/* Touch-Friendly Clipboard / URL Paste Box */}
-      <div 
-        id="paste-input-card" 
-        className={`transition-all duration-500 border-2 rounded-3xl p-5 space-y-4 ${
-          isProUser
-            ? "bg-[#16122d]/75 border-[#a855f7]/40 shadow-[0_0_20px_rgba(168,85,247,0.12)] backdrop-blur-md"
-            : "bg-[#111116] border-slate-800"
-        }`}
-      >
-        <h4 className="text-white font-display font-black text-sm flex items-center gap-2">
-          <Clipboard className={`w-5 h-5 ${isProUser ? "text-[#c084fc]" : "text-indigo-400"}`} />
-          {t.pasteTitle}
-        </h4>
-        <div className="space-y-3">
-          <textarea
-            id="paste-textarea"
-            rows={2}
-            value={pasteText}
-            onChange={handlePasteTextChange}
-            onPaste={handlePasteInput}
-            placeholder="স্ক্রিনশট কপি করে সরাসরি এখানে Ctrl+V চেপে পেস্ট করুন অথবা ইমেজ লিংক এখানে রাখুন..."
-            className={`w-full text-slate-100 placeholder-slate-500 rounded-2xl p-3.5 text-xs font-sans outline-none focus:ring-2 transition-all resize-none font-bold ${
-              isProUser
-                ? "bg-[#0c0a18] border-[#a855f7]/30 focus:border-[#a855f7]/80 focus:ring-[#a855f7]/20"
-                : "bg-[#09090b] border-slate-800 focus:border-indigo-500/80 focus:ring-indigo-500/30"
-            }`}
-            disabled={isAnalyzing}
-          />
-          {pasteError && (
-            <p className="text-rose-400 text-xs font-semibold leading-tight">
-              {pasteError}
-            </p>
-          )}
-          <div className="flex justify-end">
-            <button
-              id="load-paste-btn"
-              onClick={loadPastedContent}
-              disabled={isAnalyzing || !pasteText.trim()}
-              className={`w-full sm:w-auto disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold text-xs px-5 py-3 rounded-2xl transition duration-150 flex items-center justify-center gap-2 cursor-pointer shadow-lg active:scale-95 ${
-                isProUser
-                  ? "bg-[#a855f7] hover:bg-[#b876fc] shadow-[#a855f7]/10"
-                  : "bg-indigo-600 hover:bg-indigo-550 shadow-indigo-500/10"
-              }`}
-            >
-              <Sparkles className={`w-4 h-4 ${isProUser ? "text-purple-200 animate-spin" : "text-indigo-200"}`} style={isProUser ? { animationDuration: "12s" } : undefined} />
-              {t.pasteBtn}
-            </button>
-          </div>
-        </div>
-      </div>
+
 
       {/* Dynamic Demo Candlestick Patterns Picker */}
       <div 

@@ -57,12 +57,7 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
   const getDynamicAccounts = () => {
     let regs: Record<string, string> = {
       "limon258144@gmail.com": "limon000",
-      "admin@gmail.com": "admin123",
-      "korimanalice@gmail.com": "korim123",
-      "demo.trader@gmail.com": "demo123",
-      "safayet.trader@gmail.com": "safayet123",
-      "rashed.vip@gmail.com": "rashed123",
-      "tariq.bin.ziyad@gmail.com": "tariq123"
+      "admin@gmail.com": "admin123"
     };
     try {
       const stored = localStorage.getItem("nila_registered_users_v2");
@@ -82,12 +77,7 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
 
     const nameMap: Record<string, string> = {
       "limon258144@gmail.com": "Limon Ahmed",
-      "admin@gmail.com": "Master Admin",
-      "korimanalice@gmail.com": "Korim Trader",
-      "demo.trader@gmail.com": "Demo Account",
-      "safayet.trader@gmail.com": "Safayet Islam",
-      "rashed.vip@gmail.com": "Rashed Al-Amin",
-      "tariq.bin.ziyad@gmail.com": "Tariq Bin Ziyad"
+      "admin@gmail.com": "Master Admin"
     };
 
     const colorMap = [
@@ -194,12 +184,7 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
     // Load actual users
     let regs: Record<string, string> = {
       "limon258144@gmail.com": "limon000",
-      "admin@gmail.com": "admin123",
-      "korimanalice@gmail.com": "korim123",
-      "demo.trader@gmail.com": "demo123",
-      "safayet.trader@gmail.com": "safayet123",
-      "rashed.vip@gmail.com": "rashed123",
-      "tariq.bin.ziyad@gmail.com": "tariq123"
+      "admin@gmail.com": "admin123"
     };
 
     try {

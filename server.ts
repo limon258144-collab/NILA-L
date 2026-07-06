@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import dotenv from "dotenv";
+import fs from "fs";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 
@@ -9,6 +10,55 @@ dotenv.config({ override: true });
 
 const app = express();
 const PORT = 3000;
+
+const DB_PATH = path.join(process.cwd(), "db_state.json");
+
+interface DbState {
+  registeredUsers: Record<string, string>;
+  activeSessions: Record<string, number>;
+  proUsers: Array<{ username: string; expiresAt: number; verifiedAt: number }>;
+  submittedPayments: Array<{
+    id: string;
+    username: string;
+    senderNumber: string;
+    transactionId: string;
+    amount: number;
+    network: string;
+    status: "pending" | "approved" | "rejected";
+    timestamp: number;
+  }>;
+  supportChats: Record<string, any>;
+  analysisLimits: Record<string, any>;
+  configs: Record<string, string>;
+}
+
+function readDb(): DbState {
+  try {
+    if (fs.existsSync(DB_PATH)) {
+      const content = fs.readFileSync(DB_PATH, "utf-8");
+      return JSON.parse(content);
+    }
+  } catch (err) {
+    console.error("Error reading db_state.json:", err);
+  }
+  return {
+    registeredUsers: {},
+    activeSessions: {},
+    proUsers: [],
+    submittedPayments: [],
+    supportChats: {},
+    analysisLimits: {},
+    configs: {},
+  };
+}
+
+function writeDb(state: DbState) {
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Error writing db_state.json:", err);
+  }
+}
 
 // Set up JSON parsing with a higher limit for high-res images
 app.use(express.json({ limit: "50mb" }));
@@ -38,6 +88,126 @@ function getGenAI(): GoogleGenAI {
 app.get("/api/health", (req, res) => {
   const hasKey = !!process.env.GEMINI_API_KEY;
   res.json({ status: "ok", geminiKeyConfigured: hasKey });
+});
+
+// Real-Time Database Sync Endpoint
+app.post("/api/db/sync", (req, res) => {
+  try {
+    const payload = req.body || {};
+    const db = readDb();
+
+    // 1. Merge registeredUsers
+    if (payload.registeredUsers) {
+      db.registeredUsers = { ...db.registeredUsers, ...payload.registeredUsers };
+    }
+
+    // 2. Merge activeSessions
+    if (payload.activeSessions) {
+      for (const [username, timestamp] of Object.entries(payload.activeSessions)) {
+        const existing = db.activeSessions[username];
+        if (existing === undefined || (timestamp as number) > existing) {
+          db.activeSessions[username] = timestamp as number;
+        }
+      }
+    }
+
+    // 3. Merge proUsers
+    if (payload.proUsers && Array.isArray(payload.proUsers)) {
+      const proMap = new Map<string, any>();
+      for (const p of db.proUsers || []) {
+        if (p && p.username) {
+          proMap.set(p.username.toLowerCase(), p);
+        }
+      }
+      for (const p of payload.proUsers) {
+        if (p && p.username) {
+          const key = p.username.toLowerCase();
+          const existing = proMap.get(key);
+          if (!existing || p.expiresAt > existing.expiresAt || p.verifiedAt > existing.verifiedAt) {
+            proMap.set(key, p);
+          }
+        }
+      }
+      db.proUsers = Array.from(proMap.values());
+    }
+
+    // 4. Merge submittedPayments
+    if (payload.submittedPayments && Array.isArray(payload.submittedPayments)) {
+      const paymentMap = new Map<string, any>();
+      for (const p of db.submittedPayments || []) {
+        if (p && p.id) {
+          paymentMap.set(p.id, p);
+        }
+      }
+      for (const p of payload.submittedPayments) {
+        if (p && p.id) {
+          const existing = paymentMap.get(p.id);
+          if (!existing) {
+            paymentMap.set(p.id, p);
+          } else {
+            if (existing.status === "pending" && p.status !== "pending") {
+              paymentMap.set(p.id, p);
+            } else if (p.status === "pending" && existing.status !== "pending") {
+              // keep existing
+            } else {
+              if (p.timestamp > existing.timestamp) {
+                paymentMap.set(p.id, p);
+              }
+            }
+          }
+        }
+      }
+      db.submittedPayments = Array.from(paymentMap.values());
+    }
+
+    // 5. Merge supportChats
+    if (payload.supportChats) {
+      for (const [user, chat] of Object.entries(payload.supportChats)) {
+        const existingChat = db.supportChats[user] || { messages: [], unreadCountByUser: 0, unreadCountByAdmin: 0, lastUpdated: 0 };
+        const clientChat = chat as any;
+
+        const msgMap = new Map<string, any>();
+        for (const m of existingChat.messages || []) {
+          if (m && m.id) msgMap.set(m.id, m);
+        }
+        for (const m of clientChat.messages || []) {
+          if (m && m.id) msgMap.set(m.id, m);
+        }
+
+        const mergedMessages = Array.from(msgMap.values()).sort((a, b) => a.timestamp - b.timestamp);
+        const lastUpdated = Math.max(existingChat.lastUpdated || 0, clientChat.lastUpdated || 0);
+        const unreadCountByUser = clientChat.lastUpdated > (existingChat.lastUpdated || 0)
+          ? clientChat.unreadCountByUser
+          : existingChat.unreadCountByUser;
+        const unreadCountByAdmin = clientChat.lastUpdated > (existingChat.lastUpdated || 0)
+          ? clientChat.unreadCountByAdmin
+          : existingChat.unreadCountByAdmin;
+
+        db.supportChats[user] = {
+          messages: mergedMessages,
+          unreadCountByUser,
+          unreadCountByAdmin,
+          lastUpdated,
+        };
+      }
+    }
+
+    // 6. Merge analysisLimits
+    if (payload.analysisLimits) {
+      db.analysisLimits = { ...db.analysisLimits, ...payload.analysisLimits };
+    }
+
+    // 7. Merge configs
+    if (payload.configs) {
+      db.configs = { ...db.configs, ...payload.configs };
+    }
+
+    writeDb(db);
+    res.json({ status: "ok", state: db });
+  } catch (err: any) {
+    console.error("[Sync API Error]:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Primary Endpoint: Trading Chart pattern analyzer

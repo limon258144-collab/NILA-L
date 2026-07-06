@@ -22,6 +22,8 @@ import {
   Check,
   Edit2,
   Sliders,
+  MessageCircle,
+  Send,
 } from "lucide-react";
 import { AnalysisHistoryItem, TradingAnalysis } from "./types";
 import { translations, Language } from "./utils/translations";
@@ -86,6 +88,11 @@ export default function App() {
   // Core activeItem state referenced by the alert effects block
   const [activeItem, setActiveItem] = useState<AnalysisHistoryItem | null>(null);
 
+  // Support states
+  const [showSupportDrawer, setShowSupportDrawer] = useState(false);
+  const [userSupportMessageText, setUserSupportMessageText] = useState("");
+  const [userUnreadCount, setUserUnreadCount] = useState(0);
+
 
 
   const refreshCustomConfig = () => {
@@ -144,6 +151,18 @@ export default function App() {
       }
 
       setAnalysisReloadKey(prev => prev + 1);
+
+      // Load user support unread count
+      try {
+        const storedUser = localStorage.getItem("nila_logged_in_user_v1");
+        if (storedUser) {
+          const chats = JSON.parse(localStorage.getItem("nila_support_chats_v2") || "{}");
+          const userChat = chats[storedUser];
+          setUserUnreadCount(userChat ? (userChat.unreadCountByUser || 0) : 0);
+        } else {
+          setUserUnreadCount(0);
+        }
+      } catch (err) {}
     } catch (e) {
       console.error("Failed to load configs from storage", e);
     }
@@ -394,10 +413,79 @@ export default function App() {
     }
   };
 
+  const handleUserSendMessage = () => {
+    if (!userSupportMessageText.trim() || !currentUser) return;
+
+    try {
+      const chatsStr = localStorage.getItem("nila_support_chats_v2") || "{}";
+      const chats = JSON.parse(chatsStr);
+      const userChat = chats[currentUser] || { messages: [], unreadCountByAdmin: 0, unreadCountByUser: 0 };
+
+      const newMsg = {
+        id: "msg_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
+        sender: "user" as const,
+        text: userSupportMessageText.trim(),
+        timestamp: Date.now()
+      };
+
+      if (!userChat.messages) userChat.messages = [];
+      userChat.messages.push(newMsg);
+      userChat.unreadCountByAdmin = (userChat.unreadCountByAdmin || 0) + 1;
+      userChat.unreadCountByUser = 0; // User is active, read counter is cleared
+      userChat.lastUpdated = Date.now();
+
+      chats[currentUser] = userChat;
+      localStorage.setItem("nila_support_chats_v2", JSON.stringify(chats));
+
+      setUserSupportMessageText("");
+      window.dispatchEvent(new Event("nila_settings_updated"));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Seeding initial greeting and handling read/unread states
+  useEffect(() => {
+    if (currentUser && showSupportDrawer) {
+      try {
+        const chatsStr = localStorage.getItem("nila_support_chats_v2") || "{}";
+        const chats = JSON.parse(chatsStr);
+        if (!chats[currentUser] || !chats[currentUser].messages || chats[currentUser].messages.length === 0) {
+          chats[currentUser] = {
+            messages: [
+              {
+                id: "welcome_msg",
+                sender: "admin",
+                text: "আসসালামু আলাইকুম! নীলা ট্রেডার সাপোর্ট হাবে আপনাকে স্বাগতম। আপনার পেমেন্ট বা যেকোনো জিজ্ঞাসা এখানে মেসেজে লিখুন, আমাদের এডমিন টিম দ্রুত আপনাকে রিপ্লাই করবে।",
+                timestamp: Date.now() - 60 * 1000
+              }
+            ],
+            unreadCountByAdmin: 0,
+            unreadCountByUser: 0,
+            lastUpdated: Date.now()
+          };
+          localStorage.setItem("nila_support_chats_v2", JSON.stringify(chats));
+          window.dispatchEvent(new Event("nila_settings_updated"));
+        } else {
+          // Mark admin replies as read when opening support drawer
+          if (chats[currentUser].unreadCountByUser > 0) {
+            chats[currentUser].unreadCountByUser = 0;
+            localStorage.setItem("nila_support_chats_v2", JSON.stringify(chats));
+            window.dispatchEvent(new Event("nila_settings_updated"));
+          }
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  }, [currentUser, showSupportDrawer]);
+
   useEffect(() => {
     refreshCustomConfig();
     window.addEventListener("nila_settings_updated", refreshCustomConfig);
-    return () => window.removeEventListener("nila_settings_updated", refreshCustomConfig);
+    return () => {
+      window.removeEventListener("nila_settings_updated", refreshCustomConfig);
+    };
   }, []);
 
   // Core Data States
@@ -949,17 +1037,28 @@ export default function App() {
             NILA\L
           </div>
           
-          <div className="w-[45px]" />
+          <div className="text-[9px] font-black text-indigo-400/90 font-sans tracking-tight text-right select-none">
+            সিঙ্গেল কমিটির সভাপতি
+          </div>
         </div>
 
         {/* Dynamic Compact Interactive Main Header */}
         <header className="bg-[#0f111a]/95 border-b border-indigo-500/15 backdrop-blur-md px-4 py-3.5 flex items-center justify-between sticky top-0 z-40 select-none">
           <div className="flex items-center gap-2">
             <div 
-              onClick={() => window.open(telegramLink, "_blank")}
-              className="px-2.5 h-8 bg-indigo-600 hover:bg-indigo-500 rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/30 cursor-pointer active:scale-95 transition"
+              onClick={() => {
+                if (currentUser) {
+                  setShowSupportDrawer(true);
+                }
+              }}
+              className="px-2.5 h-8 bg-indigo-600 hover:bg-indigo-500 rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/30 cursor-pointer active:scale-95 transition relative"
               title="Inbox Admin"
             >
+              {userUnreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-rose-600 text-[8px] font-extrabold text-white rounded-full flex items-center justify-center animate-bounce">
+                  {userUnreadCount}
+                </span>
+              )}
               <span className="text-[11px] font-bold text-indigo-200 font-mono tracking-normal leading-none select-none">
                 (* ￣︿￣)
               </span>
@@ -1399,217 +1498,219 @@ export default function App() {
                     isProUser={isProUser}
                   />
 
-                </div>
-              )}
+                  {/* 🌐 LIVE TRADERS NETWORK ACTIVITY & ACCOUNTS DIRECTORY */}
+                  {isUserAdmin(currentUser) && (
+                    <div id="live-members-directory-widget" className="bg-[#111116] border-2 border-indigo-500/15 rounded-3xl p-5 space-y-4 shadow-xl select-none relative overflow-hidden text-left mt-2 animate-fade-in">
+                    {/* Glowing subtle ambient mesh */}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
+                    
+                    {/* Panel Header */}
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                      <div className="flex items-center gap-2">
+                        <span className="relative flex h-2.5 w-2.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                        </span>
+                        <h3 className="text-white text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
+                          <Wifi className="w-3.5 h-3.5 text-indigo-400" />
+                          {language === "bn" ? "লাইভ ট্রেডার্স নেটওয়ার্ক" : "Live Traders Network"}
+                        </h3>
+                      </div>
 
-              {/* 🌐 LIVE TRADERS NETWORK ACTIVITY & ACCOUNTS DIRECTORY */}
-              {isUserAdmin(currentUser) && (
-                <div id="live-members-directory-widget" className="bg-[#111116] border-2 border-indigo-500/15 rounded-3xl p-5 space-y-4 shadow-xl select-none relative overflow-hidden text-left mt-2 animate-fade-in">
-                {/* Glowing subtle ambient mesh */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
-                
-                {/* Panel Header */}
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                  <div className="flex items-center gap-2">
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                    </span>
-                    <h3 className="text-white text-xs font-black uppercase tracking-wider flex items-center gap-1.5">
-                      <Wifi className="w-3.5 h-3.5 text-indigo-400" />
-                      {language === "bn" ? "লাইভ ট্রেডার্স নেটওয়ার্ক" : "Live Traders Network"}
-                    </h3>
-                  </div>
+                      <div className="flex items-center gap-1 bg-[#09090d] border border-slate-800/60 rounded-xl px-2 py-0.5">
+                        <span className="text-[9px] font-mono font-black text-indigo-400 uppercase tracking-widest">
+                          {networkFilter === "active" ? (language === "bn" ? "সক্রিয়" : "Active") : (language === "bn" ? "সকল" : "All")}
+                        </span>
+                      </div>
+                    </div>
 
-                  <div className="flex items-center gap-1 bg-[#09090d] border border-slate-800/60 rounded-xl px-2 py-0.5">
-                    <span className="text-[9px] font-mono font-black text-indigo-400 uppercase tracking-widest">
-                      {networkFilter === "active" ? (language === "bn" ? "সক্রিয়" : "Active") : (language === "bn" ? "সকল" : "All")}
-                    </span>
-                  </div>
-                </div>
+                    {/* 📊 INTERACTIVE STATS / FILTER TABS (Click to filter names!) */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        id="logged-in-members-card"
+                        onClick={() => {
+                          setNetworkFilter("active");
+                          playSuccessChime(); // subtle sweet tick sound
+                        }}
+                        className={`p-3 rounded-2xl border transition duration-150 flex flex-col items-center justify-center gap-1 cursor-pointer select-none ${
+                          networkFilter === "active"
+                            ? "bg-indigo-650/25 border-emerald-500/50 text-white shadow-[0_0_12px_rgba(16,185,129,0.12)]"
+                            : "bg-slate-950/40 border-slate-900 text-slate-400 hover:border-slate-800 hover:text-slate-300"
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                          </span>
+                          <span className="text-[10px] font-black uppercase tracking-wider text-center">
+                            {language === "bn" ? "অনলাইন ট্রেডার্স" : "Online Traders"}
+                          </span>
+                        </div>
+                        <span className="text-[15px] font-black font-mono text-emerald-400 mt-0.5">
+                          {Object.keys(activeSessions).length} {language === "bn" ? "জন সক্রিয়" : "Active"}
+                        </span>
+                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tight mt-0.5 animate-pulse">
+                          {language === "bn" ? "নাম দেখতে চাপুন" : "Tap to show list"}
+                        </span>
+                      </button>
 
-                {/* 📊 INTERACTIVE STATS / FILTER TABS (Click to filter names!) */}
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    id="logged-in-members-card"
-                    onClick={() => {
-                      setNetworkFilter("active");
-                      playSuccessChime(); // subtle sweet tick sound
-                    }}
-                    className={`p-3 rounded-2xl border transition duration-150 flex flex-col items-center justify-center gap-1 cursor-pointer select-none ${
-                      networkFilter === "active"
-                        ? "bg-indigo-650/25 border-emerald-500/50 text-white shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                        : "bg-slate-950/40 border-slate-900 text-slate-400 hover:border-slate-800 hover:text-slate-300"
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      <button
+                        id="registered-members-card"
+                        onClick={() => {
+                          setNetworkFilter("all");
+                          playSuccessChime(); // subtle sweet tick sound
+                        }}
+                        className={`p-3 rounded-2xl border transition duration-150 flex flex-col items-center justify-center gap-1 cursor-pointer select-none ${
+                          networkFilter === "all"
+                            ? "bg-indigo-650/25 border-indigo-500/50 text-white shadow-[0_0_12px_rgba(99,102,241,0.12)]"
+                            : "bg-slate-950/40 border-slate-900 text-slate-400 hover:border-slate-800 hover:text-slate-300"
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                          <span className="text-[10px] font-black uppercase tracking-wider text-center">
+                            {language === "bn" ? "মোট লগইনকৃত" : "Total Logged-in"}
+                          </span>
+                        </div>
+                        <span className="text-[15px] font-black font-mono text-indigo-400 mt-0.5">
+                          {Object.keys(registeredUsers).length} {language === "bn" ? "টি অ্যাকাউন্ট" : "Accounts"}
+                        </span>
+                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tight mt-0.5 animate-pulse">
+                          {language === "bn" ? "নাম দেখতে চাপুন" : "Tap to show list"}
+                        </span>
+                      </button>
+                    </div>
+
+                    <div className="bg-[#14141d]/40 rounded-xl p-2 px-3 flex items-center justify-between text-[11px] text-indigo-300/90 font-bold border border-slate-900/60">
+                      <span>
+                        {language === "bn" 
+                          ? (networkFilter === "active" ? "🟢 এখন যারা অনলাইন আছেন:" : "👥 নীলা সিস্টেমে মোট লগইনকৃত মেম্বারসমূহ:")
+                          : (networkFilter === "active" ? "🟢 Showing online users now:" : "👥 Showing all registered members:")}
                       </span>
-                      <span className="text-[10px] font-black uppercase tracking-wider text-center">
-                        {language === "bn" ? "অনলাইন ট্রেডার্স" : "Online Traders"}
+                      <span className="text-[10px] font-mono bg-indigo-950/50 px-1.5 py-0.5 rounded text-indigo-400 border border-indigo-900/30">
+                        {networkFilter === "active" ? Object.keys(activeSessions).length : Object.keys(registeredUsers).length}
                       </span>
                     </div>
-                    <span className="text-[15px] font-black font-mono text-emerald-400 mt-0.5">
-                      {Object.keys(activeSessions).length} {language === "bn" ? "জন সক্রিয়" : "Active"}
-                    </span>
-                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tight mt-0.5 animate-pulse">
-                      {language === "bn" ? "নাম দেখতে চাপুন" : "Tap to show list"}
-                    </span>
-                  </button>
 
-                  <button
-                    id="registered-members-card"
-                    onClick={() => {
-                      setNetworkFilter("all");
-                      playSuccessChime(); // subtle sweet tick sound
-                    }}
-                    className={`p-3 rounded-2xl border transition duration-150 flex flex-col items-center justify-center gap-1 cursor-pointer select-none ${
-                      networkFilter === "all"
-                        ? "bg-indigo-650/25 border-indigo-500/50 text-white shadow-[0_0_12px_rgba(99,102,241,0.12)]"
-                        : "bg-slate-950/40 border-slate-900 text-slate-400 hover:border-slate-800 hover:text-slate-300"
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                      <span className="text-[10px] font-black uppercase tracking-wider text-center">
-                        {language === "bn" ? "মোট লগইনকৃত" : "Total Logged-in"}
-                      </span>
+                    {/* Directory Live Search */}
+                    <div className="relative">
+                      <input 
+                        type="text"
+                        value={communitySearch}
+                        onChange={(e) => setCommunitySearch(e.target.value)}
+                        placeholder={language === "bn" ? "ইউজার বা জিমেইল অ্যাকাউন্ট খুঁজুন..." : "Filter traders by email..."}
+                        className="w-full bg-slate-950/90 border border-slate-850 hover:border-slate-800 text-slate-200 text-xs rounded-xl py-2 px-3 placeholder-slate-600 focus:outline-none focus:border-indigo-500/40"
+                      />
                     </div>
-                    <span className="text-[15px] font-black font-mono text-indigo-400 mt-0.5">
-                      {Object.keys(registeredUsers).length} {language === "bn" ? "টি অ্যাকাউন্ট" : "Accounts"}
-                    </span>
-                    <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tight mt-0.5 animate-pulse">
-                      {language === "bn" ? "নাম দেখতে চাপুন" : "Tap to show list"}
-                    </span>
-                  </button>
-                </div>
 
-                <div className="bg-[#14141d]/40 rounded-xl p-2 px-3 flex items-center justify-between text-[11px] text-indigo-300/90 font-bold border border-slate-900/60">
-                  <span>
-                    {language === "bn" 
-                      ? (networkFilter === "active" ? "🟢 এখন যারা অনলাইন আছেন:" : "👥 নীলা সিস্টেমে মোট লগইনকৃত মেম্বারসমূহ:")
-                      : (networkFilter === "active" ? "🟢 Showing online users now:" : "👥 Showing all registered members:")}
-                  </span>
-                  <span className="text-[10px] font-mono bg-indigo-950/50 px-1.5 py-0.5 rounded text-indigo-400 border border-indigo-900/30">
-                    {networkFilter === "active" ? Object.keys(activeSessions).length : Object.keys(registeredUsers).length}
-                  </span>
-                </div>
+                    {/* Users list mapped */}
+                    <div className="space-y-2 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
+                      {Object.keys(registeredUsers).length === 0 ? (
+                        <div className="text-center py-6 text-slate-500 text-xs font-semibold italic">
+                          {language === "bn" ? "মেম্বার তালিকা লোড হচ্ছে..." : "Loading member directory..."}
+                        </div>
+                      ) : (
+                        (() => {
+                          // Filter registered list based on active/all tabs and the search query
+                          const filteredList = Object.keys(registeredUsers).filter((username) => {
+                            // If active tab is selected, must be online
+                            if (networkFilter === "active" && activeSessions[username] === undefined) {
+                              return false;
+                            }
+                            return username.toLowerCase().includes(communitySearch.trim().toLowerCase());
+                          });
 
-                {/* Directory Live Search */}
-                <div className="relative">
-                  <input 
-                    type="text"
-                    value={communitySearch}
-                    onChange={(e) => setCommunitySearch(e.target.value)}
-                    placeholder={language === "bn" ? "ইউজার বা জিমেইল অ্যাকাউন্ট খুঁজুন..." : "Filter traders by email..."}
-                    className="w-full bg-slate-950/90 border border-slate-850 hover:border-slate-800 text-slate-200 text-xs rounded-xl py-2 px-3 placeholder-slate-600 focus:outline-none focus:border-indigo-500/40"
-                  />
-                </div>
-
-                {/* Users list mapped */}
-                <div className="space-y-2 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
-                  {Object.keys(registeredUsers).length === 0 ? (
-                    <div className="text-center py-6 text-slate-500 text-xs font-semibold italic">
-                      {language === "bn" ? "মেম্বার তালিকা লোড হচ্ছে..." : "Loading member directory..."}
-                    </div>
-                  ) : (
-                    (() => {
-                      // Filter registered list based on active/all tabs and the search query
-                      const filteredList = Object.keys(registeredUsers).filter((username) => {
-                        // If active tab is selected, must be online
-                        if (networkFilter === "active" && activeSessions[username] === undefined) {
-                          return false;
-                        }
-                        return username.toLowerCase().includes(communitySearch.trim().toLowerCase());
-                      });
-
-                      if (filteredList.length === 0) {
-                        return (
-                          <div className="text-center py-6 text-slate-500 text-[11px] font-bold leading-relaxed">
-                            {language === "bn" 
-                              ? (networkFilter === "active" ? "এই মুহূর্তে কেউ অনলাইন নেই বা সার্চের সাথে মেলেনি!" : "কোনো মেম্বার ম্যাচ করেনি!") 
-                              : (networkFilter === "active" ? "No users online match active criteria!" : "No registered members match this search!")}
-                          </div>
-                        );
-                      }
-
-                      return filteredList.map((username, index) => {
-                        const isOnline = activeSessions[username] !== undefined;
-                        const isCurrentUser = username === currentUser;
-                        
-                        // Assign a deterministic clean dark gradient avatar based on name index
-                        const avatarColors = [
-                          "bg-gradient-to-tr from-cyan-600 to-indigo-600 text-white",
-                          "bg-gradient-to-tr from-purple-600 to-pink-600 text-white",
-                          "bg-gradient-to-tr from-teal-500 to-emerald-600 text-white",
-                          "bg-gradient-to-tr from-amber-500 to-rose-600 text-white"
-                        ];
-                        const colorClass = avatarColors[index % avatarColors.length];
-                        const initial = username.charAt(0).toUpperCase();
-
-                        return (
-                          <div 
-                            key={username}
-                            className={`flex items-center justify-between p-2.5 rounded-2xl border transition duration-150 ${
-                              isCurrentUser 
-                                ? "bg-indigo-950/15 border-indigo-500/25 shadow-inner" 
-                                : "bg-[#14141a]/60 border-slate-900/60 hover:border-slate-800"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              {/* Avatar badge */}
-                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs select-none shadow-md ${colorClass}`}>
-                                {initial}
+                          if (filteredList.length === 0) {
+                            return (
+                              <div className="text-center py-6 text-slate-500 text-[11px] font-bold leading-relaxed">
+                                {language === "bn" 
+                                  ? (networkFilter === "active" ? "এই মুহূর্তে কেউ অনলাইন নেই বা সার্চের সাথে মেলেনি!" : "কোনো মেম্বার ম্যাচ করেনি!") 
+                                  : (networkFilter === "active" ? "No users online match active criteria!" : "No registered members match this search!")}
                               </div>
-                              
-                              <div className="min-w-0 text-left">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-[11px] text-slate-200 font-extrabold truncate max-w-[130px] font-mono">
-                                    {username}
-                                  </span>
+                            );
+                          }
+
+                          return filteredList.map((username, index) => {
+                            const isOnline = activeSessions[username] !== undefined;
+                            const isCurrentUser = username === currentUser;
+                            
+                            // Assign a deterministic clean dark gradient avatar based on name index
+                            const avatarColors = [
+                              "bg-gradient-to-tr from-indigo-600 to-purple-600 text-white",
+                              "bg-gradient-to-tr from-pink-600 to-purple-600 text-white",
+                              "bg-gradient-to-tr from-cyan-600 to-indigo-600 text-white",
+                              "bg-gradient-to-tr from-emerald-600 to-indigo-600 text-white"
+                            ];
+                            const colorClass = avatarColors[index % avatarColors.length];
+                            const initial = username.charAt(0).toUpperCase();
+
+                            return (
+                              <div 
+                                key={username}
+                                className={`flex items-center justify-between p-2.5 rounded-2xl border transition duration-150 ${
+                                  isCurrentUser 
+                                    ? "bg-indigo-950/15 border-indigo-500/25 shadow-inner" 
+                                    : "bg-[#14141a]/60 border-slate-900/60 hover:border-slate-800"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  {/* Avatar badge */}
+                                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs select-none shadow-md ${colorClass}`}>
+                                    {initial}
+                                  </div>
                                   
-                                  {isCurrentUser && (
-                                    <span className="text-[8px] font-mono font-black border border-indigo-500/30 bg-indigo-600/10 text-indigo-400 px-1 rounded-md leading-relaxed">
-                                      YOU
+                                  <div className="min-w-0 text-left">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-[11px] text-slate-200 font-extrabold truncate max-w-[130px] font-mono">
+                                        {username}
+                                      </span>
+                                      
+                                      {isCurrentUser && (
+                                        <span className="text-[8px] font-mono font-black border border-indigo-500/30 bg-indigo-600/10 text-indigo-400 px-1 rounded-md leading-relaxed">
+                                          YOU
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="text-[9.5px] text-slate-500 font-bold block mt-0.5 leading-none">
+                                      {isUserAdmin(username) ? (language === "bn" ? "এডমিন অ্যাকাউন্ট" : "Master Admin") : (language === "bn" ? "ভিআইপি ট্রেডার" : "VIP Trader")}
                                     </span>
-                                  )}
+                                  </div>
                                 </div>
-                                <span className="text-[9.5px] text-slate-500 font-bold block mt-0.5 leading-none">
-                                  {isUserAdmin(username) ? (language === "bn" ? "এডমিন অ্যাকাউন্ট" : "Master Admin") : (language === "bn" ? "ভিআইপি ট্রেডার" : "VIP Trader")}
-                                </span>
+
+                                {/* Connection Live/Offline dot layout */}
+                                <div className="flex items-center gap-2 bg-[#09090c] border border-slate-900 px-2.5 py-1 rounded-xl shrink-0">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-400 animate-pulse" : "bg-slate-700"}`} />
+                                  <span className={`text-[10px] uppercase font-black tracking-wide ${isOnline ? "text-emerald-400" : "text-slate-500"}`}>
+                                    {isOnline 
+                                      ? (language === "bn" ? "অনলাইন" : "Active") 
+                                      : (language === "bn" ? "অফলাইন" : "Offline")
+                                    }
+                                  </span>
+                                </div>
                               </div>
-                            </div>
+                            );
+                          });
+                        })()
+                      )}
+                    </div>
 
-                            {/* Connection Live/Offline dot layout */}
-                            <div className="flex items-center gap-2 bg-[#09090c] border border-slate-900 px-2.5 py-1 rounded-xl shrink-0">
-                              <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? "bg-emerald-400 animate-pulse" : "bg-slate-700"}`} />
-                              <span className={`text-[10px] uppercase font-black tracking-wide ${isOnline ? "text-emerald-400" : "text-slate-500"}`}>
-                                {isOnline 
-                                  ? (language === "bn" ? "অনলাইন" : "Active") 
-                                  : (language === "bn" ? "অফলাইন" : "Offline")
-                                }
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()
+                    {/* Widget footer bar */}
+                    <div className="flex items-center justify-center gap-1.5 text-[9.5px] text-slate-500 font-bold pt-1 border-t border-slate-900 select-none">
+                      <span className="inline-block w-1 h-1 bg-indigo-400 rounded-full animate-bounce" />
+                      <span>
+                        {language === "bn" 
+                          ? "পদ্ধতি সুরক্ষিত এবং মেম্বার ডেটা স্বয়ংক্রিয়ভাবে সমন্বয় করা হচ্ছে" 
+                          : "System secure — live member stats synchronized interactively"}
+                      </span>
+                    </div>
+                  </div>
                   )}
-                </div>
 
-                {/* Widget footer bar */}
-                <div className="flex items-center justify-center gap-1.5 text-[9.5px] text-slate-500 font-bold pt-1 border-t border-slate-900 select-none">
-                  <span className="inline-block w-1 h-1 bg-indigo-400 rounded-full animate-bounce" />
-                  <span>
-                    {language === "bn" 
-                      ? "পদ্ধতি সুরক্ষিত এবং মেম্বার ডেটা স্বয়ংক্রিয়ভাবে সমন্বয় করা হচ্ছে" 
-                      : "System secure — live member stats synchronized interactively"}
-                  </span>
                 </div>
-              </div>
               )}
+
+
             </>
           )}
 
@@ -1619,6 +1720,112 @@ export default function App() {
         <div className="absolute bottom-1.5 inset-x-0 z-40 flex justify-center pointer-events-none hidden md:flex">
           <div className="w-32 h-1.5 bg-slate-800 rounded-full hover:bg-slate-700 transition" />
         </div>
+
+        {/* 💬 LIVE SUPPORT CHAT DRAWER */}
+        {showSupportDrawer && (
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-sm z-50 flex flex-col justify-end transition-all duration-300">
+            <div className="bg-[#111116] border-t-2 border-indigo-500/30 rounded-t-[32px] p-5 h-[85%] flex flex-col justify-between overflow-hidden relative text-left">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-805 pb-3 shrink-0">
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="w-5 h-5 text-[#c084fc] animate-pulse" />
+                  <div>
+                    <h3 className="text-white font-display font-black text-sm uppercase">
+                      {language === "bn" ? "লাইভ সাপোর্ট হাব" : "Live Support Hub"}
+                    </h3>
+                    <span className="text-[10px] text-emerald-400 font-bold block mt-0.5 select-none">
+                      🟢 {language === "bn" ? "এডমিন সাপোর্ট অনলাইন" : "Admin Support Online"}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSupportDrawer(false);
+                    // Mark all user unread messages as read
+                    try {
+                      const chatsStr = localStorage.getItem("nila_support_chats_v2") || "{}";
+                      const chats = JSON.parse(chatsStr);
+                      if (chats[currentUser || ""]) {
+                        chats[currentUser || ""].unreadCountByUser = 0;
+                        localStorage.setItem("nila_support_chats_v2", JSON.stringify(chats));
+                        window.dispatchEvent(new Event("nila_settings_updated"));
+                      }
+                    } catch (e) {}
+                  }}
+                  className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Scrollable chat messages area */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar my-4 space-y-3.5 pr-1 flex flex-col">
+                {(() => {
+                  const chats = JSON.parse(localStorage.getItem("nila_support_chats_v2") || "{}");
+                  const userChat = chats[currentUser || ""] || { messages: [] };
+                  const messages = userChat.messages || [];
+
+                  if (messages.length === 0) {
+                    return (
+                      <div className="my-auto text-center text-xs text-slate-500 font-bold italic py-10">
+                        কোনো মেসেজ নেই। নিচে আপনার যেকোনো समस्या বা প্রশ্ন টাইপ করে এডমিনকে পাঠান।
+                      </div>
+                    );
+                  }
+
+                  return messages.map((m: any) => {
+                    const isAdmin = m.sender === "admin";
+                    return (
+                      <div
+                        key={m.id}
+                        className={`flex flex-col max-w-[80%] ${
+                          isAdmin ? "self-start items-start" : "self-end items-end"
+                        }`}
+                      >
+                        <div
+                          className={`px-3.5 py-2.5 rounded-2xl text-xs font-semibold leading-relaxed break-words text-left ${
+                            isAdmin
+                              ? "bg-slate-900 border border-slate-805 text-slate-100 rounded-tl-none"
+                              : "bg-indigo-600 text-white rounded-tr-none shadow-md"
+                          }`}
+                        >
+                          {m.text}
+                        </div>
+                        <span className="text-[7.5px] font-mono font-bold text-slate-550 mt-1 select-none px-1 block bg-transparent">
+                          {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+
+              {/* Input Area Row */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleUserSendMessage();
+                }}
+                className="p-2 border border-slate-850 bg-slate-950 rounded-2xl flex items-center gap-2 shrink-0"
+              >
+                <input
+                  type="text"
+                  value={userSupportMessageText}
+                  onChange={(e) => setUserSupportMessageText(e.target.value)}
+                  placeholder={language === "bn" ? "মেসেজ লিখুন..." : "Type your message..."}
+                  className="flex-1 bg-transparent text-slate-205 text-xs py-2 px-3 focus:outline-none placeholder-slate-650"
+                />
+                <button
+                  type="submit"
+                  className="p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition cursor-pointer active:scale-95"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Navigation Sidebar Drawer for History (Optimized layout for phone overlay) */}
         {showHistoryDrawer && (
