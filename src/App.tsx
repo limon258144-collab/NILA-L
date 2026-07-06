@@ -32,6 +32,7 @@ import RainEffect from "./components/RainEffect";
 import AnalysisResult from "./components/AnalysisResult";
 import LoginScreen from "./components/LoginScreen";
 import AdminPanel from "./components/AdminPanel";
+import { syncWithServer } from "./sync";
 
 export default function App() {
   // Translate & Language States
@@ -243,6 +244,7 @@ export default function App() {
           };
           payments.push(payItem);
           localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(payments));
+          syncWithServer();
           
           setIsVerifyingTx(false);
           setVerificationStep(0);
@@ -482,8 +484,13 @@ export default function App() {
 
   useEffect(() => {
     refreshCustomConfig();
+    syncWithServer();
+    const intervalId = setInterval(() => {
+      syncWithServer();
+    }, 5000);
     window.addEventListener("nila_settings_updated", refreshCustomConfig);
     return () => {
+      clearInterval(intervalId);
       window.removeEventListener("nila_settings_updated", refreshCustomConfig);
     };
   }, []);

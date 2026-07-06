@@ -22,6 +22,7 @@ import {
   Send,
   MessageCircle
 } from "lucide-react";
+import { syncWithServer } from "../sync";
 interface AdminPanelProps {
   language: "bn" | "en";
   onBackToApp: () => void;
@@ -203,6 +204,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
   const handleSaveConfigValue = (key: string, value: string, label: string) => {
     localStorage.setItem(key, value);
     window.dispatchEvent(new Event("nila_settings_updated"));
+    syncWithServer();
     showToast(`${label} সফলভাবে সেভ করা হয়েছে!`);
   };
 
@@ -220,6 +222,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
       });
       localStorage.setItem("nila_pro_users_v1", JSON.stringify(filtered));
       window.dispatchEvent(new Event("nila_settings_updated"));
+      syncWithServer();
       showToast(`${username} প্রো অ্যাক্টিভেট সফল!`);
     } catch (e) {
       console.error(e);
@@ -235,6 +238,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
       });
       localStorage.setItem("nila_pro_users_v1", JSON.stringify(filtered));
       window.dispatchEvent(new Event("nila_settings_updated"));
+      syncWithServer();
       showToast(`${username} ডি-অ্যাক্টিভেট করা হয়েছে।`);
     } catch (e) {
       console.error(e);
@@ -250,6 +254,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
       });
       localStorage.setItem("nila_pro_users_v1", JSON.stringify(kept));
       window.dispatchEvent(new Event("nila_settings_updated"));
+      syncWithServer();
       setAdminAlertMsg(null);
       showToast("সকল সাধারণ ইউজার আনভেরিফাইড করা হয়েছে!");
     } catch (e) {
@@ -267,6 +272,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
     const updated = submittedPayments.map(p => p.id === pay.id ? { ...p, status: "rejected" } : p);
     localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(updated));
     window.dispatchEvent(new Event("nila_settings_updated"));
+    syncWithServer();
     showToast("ট্রানজেকশন বাতিল করা হয়েছে।");
   };
 
