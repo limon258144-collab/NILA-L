@@ -142,10 +142,7 @@ export default function App() {
         setActiveSessions(JSON.parse(storedActive));
       } else {
         const defaultActive = {
-          "limon258144@gmail.com": Date.now(),
-          "demo.trader@gmail.com": Date.now() - 15000,
-          "rashed.vip@gmail.com": Date.now() - 45000,
-          "korimanalice@gmail.com": Date.now() - 120000
+          "limon258144@gmail.com": Date.now()
         };
         setActiveSessions(defaultActive);
         localStorage.setItem("nila_active_sessions_v1", JSON.stringify(defaultActive));
@@ -1581,24 +1578,53 @@ export default function App() {
                           </span>
                         </div>
                         <span className="text-[15px] font-black font-mono text-indigo-400 mt-0.5">
-                          {Object.keys(registeredUsers).length} {language === "bn" ? "টি অ্যাকাউন্ট" : "Accounts"}
+                          {Object.keys(registeredUsers).filter(u => {
+                            const lower = u.toLowerCase();
+                            if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
+                            try {
+                              const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
+                              return typeof times[u] === "number" && times[u] >= 1783364400000;
+                            } catch {
+                              return false;
+                            }
+                          }).length} {language === "bn" ? "টি অ্যাকাউন্ট" : "Accounts"}
                         </span>
                         <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tight mt-0.5 animate-pulse">
                           {language === "bn" ? "নাম দেখতে চাপুন" : "Tap to show list"}
                         </span>
                       </button>
-                    </div>
+                     </div>
 
-                    <div className="bg-[#14141d]/40 rounded-xl p-2 px-3 flex items-center justify-between text-[11px] text-indigo-300/90 font-bold border border-slate-900/60">
-                      <span>
-                        {language === "bn" 
-                          ? (networkFilter === "active" ? "🟢 এখন যারা অনলাইন আছেন:" : "👥 নীলা সিস্টেমে মোট লগইনকৃত মেম্বারসমূহ:")
-                          : (networkFilter === "active" ? "🟢 Showing online users now:" : "👥 Showing all registered members:")}
-                      </span>
-                      <span className="text-[10px] font-mono bg-indigo-950/50 px-1.5 py-0.5 rounded text-indigo-400 border border-indigo-900/30">
-                        {networkFilter === "active" ? Object.keys(activeSessions).length : Object.keys(registeredUsers).length}
-                      </span>
-                    </div>
+                     <div className="bg-[#14141d]/40 rounded-xl p-2 px-3 flex items-center justify-between text-[11px] text-indigo-300/90 font-bold border border-slate-900/60">
+                       <span>
+                         {language === "bn" 
+                           ? (networkFilter === "active" ? "🟢 এখন যারা অনলাইন আছেন:" : "👥 নীলা সিস্টেমে মোট লগইনকৃত মেম্বারসমূহ:")
+                           : (networkFilter === "active" ? "🟢 Showing online users now:" : "👥 Showing all registered members:")}
+                       </span>
+                       <span className="text-[10px] font-mono bg-indigo-950/50 px-1.5 py-0.5 rounded text-indigo-400 border border-indigo-900/30">
+                        {networkFilter === "active" 
+                          ? Object.keys(activeSessions).filter(u => {
+                              const lower = u.toLowerCase();
+                              if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
+                              try {
+                                const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
+                                return typeof times[u] === "number" && times[u] >= 1783364400000;
+                              } catch {
+                                return false;
+                              }
+                            }).length 
+                          : Object.keys(registeredUsers).filter(u => {
+                              const lower = u.toLowerCase();
+                              if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
+                              try {
+                                const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
+                                return typeof times[u] === "number" && times[u] >= 1783364400000;
+                              } catch {
+                                return false;
+                              }
+                            }).length}
+                       </span>
+                     </div>
 
                     {/* Directory Live Search */}
                     <div className="relative">
@@ -1621,6 +1647,16 @@ export default function App() {
                         (() => {
                           // Filter registered list based on active/all tabs and the search query
                           const filteredList = Object.keys(registeredUsers).filter((username) => {
+                            const lower = username.toLowerCase();
+                            if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
+                            try {
+                              const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
+                              if (!(typeof times[username] === "number" && times[username] >= 1783364400000)) {
+                                return false;
+                              }
+                            } catch {
+                              return false;
+                            }
                             // If active tab is selected, must be online
                             if (networkFilter === "active" && activeSessions[username] === undefined) {
                               return false;

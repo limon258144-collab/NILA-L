@@ -107,28 +107,22 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
     const hasOldSeed = usersList["rifat_trader"] !== undefined || usersList["limon"] === "google-oauth" || usersList["limon44@gmail.com"] === "limon1234";
     
     if (hasOldSeed || Object.keys(usersList).length === 0) {
-      // Keep only real default logins (such as the admin accounts) and clear the artificial mock accounts
       usersList = {
-        "limon258144@gmail.com": "limon000",
-        "admin@gmail.com": "admin123"
+        "limon258144@gmail.com": "google-oauth",
+        "admin": "admin123"
       };
       localStorage.setItem("nila_registered_users_v2", JSON.stringify(usersList));
       
-      // Clean up mock pro users list
       const start1 = Date.now();
       const newProUsers = [
-        { username: "limon258144@gmail.com", expiresAt: start1 + 30 * 24 * 3600 * 1000, verifiedAt: start1 },
-        { username: "admin@gmail.com", expiresAt: start1 + 100 * 24 * 3600 * 1000, verifiedAt: start1 }
+        { username: "limon258144@gmail.com", expiresAt: start1 + 30 * 24 * 3600 * 1000, verifiedAt: start1 }
       ];
       localStorage.setItem("nila_pro_users_v1", JSON.stringify(newProUsers));
       
-      // Clean up active sessions
       localStorage.setItem("nila_active_sessions_v1", JSON.stringify({
-        "limon258144@gmail.com": Date.now(),
-        "admin@gmail.com": Date.now()
+        "limon258144@gmail.com": Date.now()
       }));
       
-      // Clear mock limits and submitted payments
       localStorage.setItem("nila_analysis_limits_v1", JSON.stringify({}));
       localStorage.setItem("nila_submitted_payments_v1", JSON.stringify([]));
     }
@@ -138,7 +132,12 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
     runDataSeeding();
     try {
       setUsers(JSON.parse(localStorage.getItem("nila_registered_users_v2") || "{}"));
-      setSubmittedPayments(JSON.parse(localStorage.getItem("nila_submitted_payments_v1") || "[]"));
+      const rawPayments = JSON.parse(localStorage.getItem("nila_submitted_payments_v1") || "[]") as any[];
+      const realPayments = rawPayments.filter((p: any) => p && p.id && p.id.length > 12 && p.id.split("_").length >= 3);
+      if (rawPayments.length !== realPayments.length) {
+        localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(realPayments));
+      }
+      setSubmittedPayments(realPayments);
       setActiveSessions(JSON.parse(localStorage.getItem("nila_active_sessions_v1") || "{}"));
       setSupportChats(JSON.parse(localStorage.getItem("nila_support_chats_v2") || "{}"));
       setAnalysisLimits(JSON.parse(localStorage.getItem("nila_analysis_limits_v1") || "{}"));
@@ -262,6 +261,37 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
     }
   };
 
+  const handleDeleteAllUsers = () => {
+    try {
+      const keptUsers = {
+        "admin": users["admin"] || "admin123",
+        "limon258144@gmail.com": users["limon258144@gmail.com"] || "google-oauth"
+      };
+      localStorage.setItem("nila_registered_users_v2", JSON.stringify(keptUsers));
+
+      // Also clean up pro status and active sessions for others
+      const proUsers: any[] = JSON.parse(localStorage.getItem("nila_pro_users_v1") || "[]");
+      const filteredPro = proUsers.filter((e: any) => {
+        const name = (typeof e === "string" ? e : e.username).toLowerCase();
+        return name === "admin" || name === "limon258144@gmail.com";
+      });
+      localStorage.setItem("nila_pro_users_v1", JSON.stringify(filteredPro));
+
+      const sessions = JSON.parse(localStorage.getItem("nila_active_sessions_v1") || "{}");
+      const filteredSessions: Record<string, any> = {};
+      if (sessions["admin"] !== undefined) filteredSessions["admin"] = sessions["admin"];
+      if (sessions["limon258144@gmail.com"] !== undefined) filteredSessions["limon258144@gmail.com"] = sessions["limon258144@gmail.com"];
+      localStorage.setItem("nila_active_sessions_v1", JSON.stringify(filteredSessions));
+
+      window.dispatchEvent(new Event("nila_settings_updated"));
+      syncWithServer();
+      setAdminAlertMsg(null);
+      showToast("সব ইউজার আইডি সফলভাবে মুছে ফেলা হয়েছে!");
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleApprovePayment = (pay: any) => {
     const updated = submittedPayments.map(p => p.id === pay.id ? { ...p, status: "approved" } : p);
     localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(updated));
@@ -351,6 +381,13 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
     const cleanUsername = newUsername.trim();
     const updated = { ...users, [cleanUsername]: newPassword || "123456" };
     localStorage.setItem("nila_registered_users_v2", JSON.stringify(updated));
+    try {
+      const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
+      times[cleanUsername] = Date.now();
+      localStorage.setItem("nila_registration_times_v1", JSON.stringify(times));
+    } catch (err) {
+      console.error(err);
+    }
     window.dispatchEvent(new Event("nila_settings_updated"));
     setShowAddUserModal(false);
     setNewUsername("");
@@ -389,13 +426,34 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
     return `${getBngNum(h)}:${getBngNum(m)} ${ampm}`;
   };
 
+  const isUserRegisteredTodayOnwards = (username: string): boolean => {
+    try {
+      const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
+      const regTime = times[username];
+      const baseline = 1783364400000; // July 6, 2026 12:00:00 PM
+      return typeof regTime === "number" && regTime >= baseline;
+    } catch (e) {
+      return false;
+    }
+  };
+
   // Calculations for Counters & Statuses
-  const totalUsersCount = Object.keys(users).length;
-  const verifiedList = Object.keys(users).filter(u => checkUserProStatus(u));
+  const totalUsersCount = Object.keys(users).filter(u => {
+    const lower = u.toLowerCase();
+    if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
+    return isUserRegisteredTodayOnwards(u);
+  }).length;
+  const verifiedList = Object.keys(users).filter(u => {
+    const lower = u.toLowerCase();
+    if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
+    return isUserRegisteredTodayOnwards(u) && checkUserProStatus(u);
+  });
   const verifiedCount = verifiedList.length;
   const expiredTrialList = Object.keys(users).filter(un => {
+    const lower = un.toLowerCase();
+    if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
     const limitArr = analysisLimits[un] || [];
-    return !checkUserProStatus(un) && limitArr.length >= 3;
+    return isUserRegisteredTodayOnwards(un) && !checkUserProStatus(un) && limitArr.length >= 3;
   });
   const expiredCount = expiredTrialList.length;
   const unverifiedCount = Math.max(0, totalUsersCount - verifiedCount - expiredCount);
@@ -441,6 +499,9 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
 
   // Dynamic queries filtering
   const filteredUsers = Object.keys(users).filter(un => {
+    const lower = un.toLowerCase();
+    if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
+    if (!isUserRegisteredTodayOnwards(un)) return false;
     const matchesSearch = un.toLowerCase().includes(searchQuery.trim().toLowerCase());
     if (!matchesSearch) return false;
 
@@ -758,6 +819,13 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
                   <Plus className="w-3.5 h-3.5" />
                   নতুন ইউজার বানান
                 </button>
+                <button
+                  onClick={() => setAdminAlertMsg("bulk_delete_users")}
+                  className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-[10px] px-3 py-1.5 rounded-xl flex items-center gap-1 active:scale-95 transition cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  সব ইউজার মুছুন
+                </button>
                 <span className="text-[10px] text-slate-500 font-mono font-bold">
                   ফলাফল: {getBngNum(filteredUsers.length)} জন পাওয়া গেছে
                 </span>
@@ -791,13 +859,12 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
                           <div className="flex items-center gap-2.5">
                             <div className="relative">
                               <div className="w-9 h-9 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center font-black text-xs text-indigo-400 uppercase">
-                                {un.charAt(0)}
+                                {uid ? uid.charAt(0) : "U"}
                               </div>
                               <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#111116] ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-slate-600"}`} />
                             </div>
                             <div className="text-left leading-tight">
-                              <span className="font-extrabold text-white text-xs block">{un}</span>
-                              <span className="text-slate-500 text-[9.5px] font-mono block mt-0.5 max-w-[120px] truncate">{uid}</span>
+                              <span className="font-mono font-extrabold text-white text-xs block max-w-[150px] truncate">{uid}</span>
                             </div>
                           </div>
                         </td>
@@ -1458,6 +1525,39 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
                 className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold py-2.5 rounded-xl transition cursor-pointer"
               >
                 হ্যাঁ, নিশ্চিত
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION DIALOG MODAL FOR BULK USER DELETION */}
+      {adminAlertMsg === "bulk_delete_users" && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-[#111116] border-2 border-rose-500/30 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-3xl text-center select-none animate-fade-in">
+            <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/20">
+              <Trash2 className="w-6 h-6 animate-pulse" />
+            </div>
+            <div className="space-y-1.5">
+              <h4 className="text-white font-black text-sm uppercase tracking-wide">
+                নিশ্চিত সব ইউজার ডিলিট?
+              </h4>
+              <p className="text-slate-400 text-xs leading-relaxed font-bold">
+                আপনি কি আসলেই সব ইউজার আইডি সম্পূর্ণ মুছে ফেলতে চান? এটি পুনরায় ফিরিয়ে আনা যাবে না!
+              </p>
+            </div>
+            <div className="flex gap-2.5 pt-1">
+              <button
+                onClick={() => setAdminAlertMsg(null)}
+                className="flex-1 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 text-xs font-bold py-2.5 rounded-xl transition cursor-pointer"
+              >
+                বাতিল করুন
+              </button>
+              <button
+                onClick={handleDeleteAllUsers}
+                className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold py-2.5 rounded-xl transition cursor-pointer"
+              >
+                হ্যাঁ, মুছে ফেলুন
               </button>
             </div>
           </div>

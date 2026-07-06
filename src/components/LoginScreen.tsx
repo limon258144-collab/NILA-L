@@ -147,8 +147,14 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
       // Store in users locally for traceability
       try {
         const users = JSON.parse(localStorage.getItem("nila_registered_users_v2") || "{}");
+        const isNew = !users[cleanMail];
         users[cleanMail] = "google-oauth";
         localStorage.setItem("nila_registered_users_v2", JSON.stringify(users));
+        if (isNew) {
+          const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
+          times[cleanMail] = Date.now();
+          localStorage.setItem("nila_registration_times_v1", JSON.stringify(times));
+        }
       } catch (err) {
         console.error(err);
       }
@@ -302,6 +308,9 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
     regs[email] = password;
     try {
       localStorage.setItem("nila_registered_users_v2", JSON.stringify(regs));
+      const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
+      times[email] = Date.now();
+      localStorage.setItem("nila_registration_times_v1", JSON.stringify(times));
     } catch (err) {
       console.error(err);
     }

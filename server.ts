@@ -36,7 +36,13 @@ function readDb(): DbState {
   try {
     if (fs.existsSync(DB_PATH)) {
       const content = fs.readFileSync(DB_PATH, "utf-8");
-      return JSON.parse(content);
+      const db = JSON.parse(content) as DbState;
+      if (db && Array.isArray(db.submittedPayments)) {
+        db.submittedPayments = db.submittedPayments.filter((p: any) => {
+          return p && p.id && p.id.length > 12 && p.id.split("_").length >= 3;
+        });
+      }
+      return db;
     }
   } catch (err) {
     console.error("Error reading db_state.json:", err);
@@ -157,7 +163,9 @@ app.post("/api/db/sync", (req, res) => {
           }
         }
       }
-      db.submittedPayments = Array.from(paymentMap.values());
+      db.submittedPayments = Array.from(paymentMap.values()).filter((p: any) => {
+        return p && p.id && p.id.length > 12 && p.id.split("_").length >= 3;
+      });
     }
 
     // 5. Merge supportChats

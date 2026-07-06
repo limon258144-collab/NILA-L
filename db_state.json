@@ -1,0 +1,45 @@
+{
+  "registeredUsers": {
+    "limon258144@gmail.com": "google-oauth",
+    "admin": "admin123"
+  },
+  "activeSessions": {
+    "limon258144@gmail.com": 1783363614143
+  },
+  "proUsers": [],
+  "submittedPayments": [],
+  "supportChats": {
+    "limon258144@gmail.com": {
+      "messages": [
+        {
+          "id": "welcome_msg",
+          "sender": "admin",
+          "text": "আসসালামু আলাইকুম! নীলা ট্রেডার সাপোর্ট হাবে আপনাকে স্বাগতম। আপনার পেমেন্ট বা যেকোনো জিজ্ঞাসা এখানে মেসেজে লিখুন, আমাদের এডমিন টিম দ্রুত আপনাকে রিপ্লাই করবে।",
+          "timestamp": 1783361073230
+        },
+        {
+          "id": "msg_1783361142022_507",
+          "sender": "user",
+          "text": "hi",
+          "timestamp": 1783361142022
+        }
+      ],
+      "unreadCountByUser": 0,
+      "unreadCountByAdmin": 1,
+      "lastUpdated": 1783361142022
+    }
+  },
+  "analysisLimits": {},
+  "configs": {
+    "nila_custom_telegram_v1": "https://t.me/jayedbhai_12",
+    "nila_custom_owner1_v1": "nila\\ldp.onar",
+    "nila_custom_owner2_v1": "korim debolopar",
+    "nila_custom_winrate_v1": "98%",
+    "nila_custom_announcement_v1": "যেকোনো প্রয়োজনে নিচে দেওয়া টেলিগ্রাম লিংকে মেসেজ করুন",
+    "nila_custom_usdt_v1": "TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x",
+    "nila_custom_trx_v1": "TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x",
+    "nila_custom_ltc_v1": "01568760651",
+    "nila_custom_bkash_inst_v1": "* এই বিকাশ পার্সোনাল নাম্বারে সমপরিমাণ টাকা Send Money করুন।",
+    "nila_custom_crypto_inst_v1": "* Send exactly the payment amount to this receiver wallet."
+  }
+}
