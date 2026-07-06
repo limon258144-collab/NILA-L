@@ -1578,16 +1578,19 @@ export default function App() {
                           </span>
                         </div>
                         <span className="text-[15px] font-black font-mono text-indigo-400 mt-0.5">
-                          {Object.keys(registeredUsers).filter(u => {
-                            const lower = u.toLowerCase();
-                            if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
-                            try {
-                              const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
-                              return typeof times[u] === "number" && times[u] >= 1783364400000;
-                            } catch {
-                              return false;
-                            }
-                          }).length} {language === "bn" ? "টি অ্যাকাউন্ট" : "Accounts"}
+                          {(() => {
+                            const actualCount = Object.keys(registeredUsers).filter(u => {
+                              const lower = u.toLowerCase();
+                              if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
+                              try {
+                                const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
+                                return typeof times[u] === "number" && times[u] >= 1783364400000;
+                              } catch {
+                                return false;
+                              }
+                            }).length;
+                            return actualCount + 50;
+                          })()} {language === "bn" ? "টি অ্যাকাউন্ট" : "Accounts"}
                         </span>
                         <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tight mt-0.5 animate-pulse">
                           {language === "bn" ? "নাম দেখতে চাপুন" : "Tap to show list"}
@@ -1613,16 +1616,19 @@ export default function App() {
                                 return false;
                               }
                             }).length 
-                          : Object.keys(registeredUsers).filter(u => {
-                              const lower = u.toLowerCase();
-                              if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
-                              try {
-                                const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
-                                return typeof times[u] === "number" && times[u] >= 1783364400000;
-                              } catch {
-                                return false;
-                              }
-                            }).length}
+                          : (() => {
+                              const actualCount = Object.keys(registeredUsers).filter(u => {
+                                const lower = u.toLowerCase();
+                                if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
+                                try {
+                                  const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
+                                  return typeof times[u] === "number" && times[u] >= 1783364400000;
+                                } catch {
+                                  return false;
+                                }
+                              }).length;
+                              return actualCount + 50;
+                            })()}
                        </span>
                      </div>
 
