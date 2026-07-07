@@ -13,6 +13,7 @@ import {
   Battery,
   Signal,
   History,
+  Clock,
   X,
   Smartphone,
   Sparkles,
@@ -81,6 +82,7 @@ export default function App() {
   const [payError, setPayError] = useState<string | null>(null);
   const [paySuccess, setPaySuccess] = useState<string | null>(null);
   const [walletCopied, setWalletCopied] = useState<boolean>(false);
+  const [hasPendingPayment, setHasPendingPayment] = useState<boolean>(false);
   
   // bKash quick-edit inline support
   const [isEditingBkash, setIsEditingBkash] = useState(false);
@@ -150,15 +152,17 @@ export default function App() {
 
       setAnalysisReloadKey(prev => prev + 1);
 
-      // Load user support unread count
+      // Load user support unread count and pending payment state
       try {
         const storedUser = localStorage.getItem("nila_logged_in_user_v1");
         if (storedUser) {
           const chats = JSON.parse(localStorage.getItem("nila_support_chats_v2") || "{}");
           const userChat = chats[storedUser];
           setUserUnreadCount(userChat ? (userChat.unreadCountByUser || 0) : 0);
+          setHasPendingPayment(checkUserPendingPayment(storedUser));
         } else {
           setUserUnreadCount(0);
+          setHasPendingPayment(false);
         }
       } catch (err) {}
     } catch (e) {
@@ -242,6 +246,7 @@ export default function App() {
           payments.push(payItem);
           localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(payments));
           syncWithServer();
+          refreshCustomConfig();
           
           setIsVerifyingTx(false);
           setVerificationStep(0);
@@ -327,6 +332,18 @@ export default function App() {
         }
         return false;
       });
+    } catch (e) {
+      return false;
+    }
+  };
+
+  // Check if user has a pending payment submission
+  const checkUserPendingPayment = (username: string | null): boolean => {
+    if (!username) return false;
+    try {
+      const currentPaymentsStr = localStorage.getItem("nila_submitted_payments_v1") || "[]";
+      const payments: any[] = JSON.parse(currentPaymentsStr);
+      return payments.some((p: any) => p && p.username === username && p.status === "pending");
     } catch (e) {
       return false;
     }
@@ -1205,6 +1222,7 @@ export default function App() {
               {currentUser && !isUserAdmin(currentUser) && (
                 (() => {
                   const isPro = checkUserProStatus(currentUser);
+                  const hasPendingPayment = checkUserPendingPayment(currentUser);
                   const limitInfo = checkAnalysisLimit(currentUser);
                   return (
                     <div>
@@ -1236,6 +1254,32 @@ export default function App() {
                                 }
                                 return language === "bn" ? "আজীবন" : "Lifetime";
                               })()}
+                            </div>
+                          </div>
+                        </div>
+                      ) : hasPendingPayment ? (
+                        <div 
+                          onClick={() => setShowPaymentGateway(true)}
+                          className="p-3.5 rounded-2xl border bg-amber-950/25 border-amber-500/30 text-amber-300 hover:border-amber-500/50 hover:bg-amber-950/40 transition duration-155 cursor-pointer active:scale-[0.98] select-none"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-col text-left bg-transparent">
+                              <div className="flex items-center gap-2 bg-transparent">
+                                <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                                <span className="font-extrabold select-none text-[11px] sm:text-xs text-amber-300">
+                                  {language === "bn"
+                                    ? "পেমেন্ট ভেরিফিকেশন পেন্ডিং..."
+                                    : "Payment Verification Pending..."}
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-slate-400 font-bold select-none block mt-0.5 bg-transparent">
+                                {language === "bn"
+                                  ? "এডমিন আপনার ট্রানজেকশন আইডি চেক করতেছে"
+                                  : "Admin is verifying your transaction ID"}
+                              </span>
+                            </div>
+                            <div className="font-mono font-black text-right text-[10px] bg-amber-500/10 text-amber-400 px-3 py-1.5 rounded-xl border border-amber-500/20 animate-pulse uppercase tracking-wide">
+                              {language === "bn" ? "পেন্ডিং" : "Pending"}
                             </div>
                           </div>
                         </div>
@@ -1370,13 +1414,17 @@ export default function App() {
                       disabled={!isUserAdmin(currentUser) && checkAnalysisLimit(currentUser || "").remaining <= 0}
                       className={`w-full font-black py-3.5 px-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition duration-150 active:scale-95 cursor-pointer ${
                         !isUserAdmin(currentUser) && checkAnalysisLimit(currentUser || "").remaining <= 0
-                          ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50 shadow-none"
+                          ? hasPendingPayment
+                            ? "bg-amber-950/20 text-amber-400 border border-amber-500/30 cursor-not-allowed shadow-none"
+                            : "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50 shadow-none"
                           : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/20 animate-breath"
                       }`}
                     >
                       <Search className="w-5 h-5" />
                       {!isUserAdmin(currentUser) && checkAnalysisLimit(currentUser || "").remaining <= 0
-                        ? (language === "bn" ? "ফ্রি লিমিট শেষ (৩/৩)" : "Free Limit Reached (3/3)")
+                        ? hasPendingPayment
+                          ? (language === "bn" ? "পেমেন্ট ভেরিফিকেশন পেন্ডিং..." : "Payment Verification Pending...")
+                          : (language === "bn" ? "ফ্রি লিমিট শেষ (৩/৩)" : "Free Limit Reached (3/3)")
                         : (language === "bn" ? "বিশ্লেষণ শুরু করুন" : "Start Analysis")}
                     </button>
                     <button
