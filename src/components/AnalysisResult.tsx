@@ -66,14 +66,23 @@ export default function AnalysisResult({ analysis = {} as TradingAnalysis, langu
     PredictionIcon = ArrowDownCircle;
   }
 
-  // Fallback support and resistance levels from fields if missing in arrays
-  const supportLevels = (analysis?.supportLevels && analysis.supportLevels.length > 0) 
-    ? analysis.supportLevels 
-    : [analysis?.priceCloseUpEntry || "N/A"];
+  const rawSupport = (analysis?.supportLevels && analysis.supportLevels.length > 0 && analysis.supportLevels[0] !== "N/A") 
+    ? analysis.supportLevels[0] 
+    : (analysis?.priceCloseDownEntry || "N/A");
 
-  const resistanceLevels = (analysis?.resistanceLevels && analysis.resistanceLevels.length > 0) 
-    ? analysis.resistanceLevels 
-    : [analysis?.priceCloseDownEntry || "N/A"];
+  const rawResistance = (analysis?.resistanceLevels && analysis.resistanceLevels.length > 0 && analysis.resistanceLevels[0] !== "N/A") 
+    ? analysis.resistanceLevels[0] 
+    : (analysis?.priceCloseUpEntry || "N/A");
+
+  const extractPrice = (str: string): string => {
+    if (!str || str === "N/A") return "N/A";
+    // Look for first price string (like 1.08245, 67200, 2320.50, etc)
+    const match = str.match(/\d+(?:\.\d+)?/);
+    return match ? match[0] : str;
+  };
+
+  const supportPrice = extractPrice(rawSupport);
+  const resistancePrice = extractPrice(rawResistance);
 
   return (
     <div id="trading-analysis-results" className="space-y-4">
@@ -137,21 +146,21 @@ export default function AnalysisResult({ analysis = {} as TradingAnalysis, langu
         </div>
         
         <div className="space-y-3 text-xs sm:text-sm text-slate-200 font-semibold leading-relaxed">
-          {resistanceLevels && resistanceLevels[0] !== "N/A" && (
+          {resistancePrice !== "N/A" && (
             <div className="bg-emerald-950/15 border border-emerald-500/20 rounded-xl p-3">
               <span className="text-emerald-400 font-bold block mb-1">UP (বুলিশ) ট্রেড এর নিয়ম:</span>
-              রানিং ক্যান্ডেলটি যদি <strong className="text-emerald-300 font-mono text-sm px-2 py-0.5 bg-slate-950 border border-emerald-500/30 rounded-md select-all">{resistanceLevels[0]}</strong> এর উপরে গেলে সরাসরি <strong className="text-emerald-300 font-black">UP ট্রেড নিবেন</strong>।
+              রানিং ক্যান্ডেলটি যদি <strong className="text-emerald-300 font-mono text-sm px-2 py-0.5 bg-slate-950 border border-emerald-500/30 rounded-md select-all">{resistancePrice}</strong> এর উপরে গেলে সরাসরি <strong className="text-emerald-300 font-black">UP ট্রেড নিবেন</strong>।
             </div>
           )}
 
-          {supportLevels && supportLevels[0] !== "N/A" && (
+          {supportPrice !== "N/A" && (
             <div className="bg-rose-950/15 border border-rose-500/20 rounded-xl p-3">
               <span className="text-rose-400 font-bold block mb-1">DOWN (বেয়ারিশ) ট্রেড এর নিয়ম:</span>
-              রানিং ক্যান্ডেলটি যদি <strong className="text-rose-300 font-mono text-sm px-2 py-0.5 bg-slate-950 border border-rose-500/30 rounded-md select-all">{supportLevels[0]}</strong> এর নিচে গেলে সরাসরি <strong className="text-rose-300 font-black">DOWN ট্রেড নিবেন</strong>।
+              রানিং ক্যান্ডেলটি যদি <strong className="text-rose-300 font-mono text-sm px-2 py-0.5 bg-slate-950 border border-rose-500/30 rounded-md select-all">{supportPrice}</strong> এর নিচে গেলে সরাসরি <strong className="text-rose-300 font-black">DOWN ট্রেড নিবেন</strong>।
             </div>
           )}
 
-          {(!supportLevels || supportLevels[0] === "N/A") && (!resistanceLevels || resistanceLevels[0] === "N/A") && (
+          {supportPrice === "N/A" && resistancePrice === "N/A" && (
             <div className={`border rounded-xl p-4 space-y-2 text-center ${isNotChart ? "bg-rose-950/10 border-rose-500/30" : "bg-[#18110b] border-amber-500/30"}`}>
               <span className={`font-black text-xs sm:text-sm block ${isNotChart ? "text-rose-450" : "text-amber-500"}`}>
                 {isNotChart 

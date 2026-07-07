@@ -290,6 +290,15 @@ app.post("/api/analyze", async (req, res): Promise<any> => {
       - 'suggestedTakeProfit' to "N/A"
 
       Only if the image is a valid trading chart, proceed with the following detailed technical analysis instructions.
+
+      STRICT DIRECTION ACCURACY CONSTRAINT (আপ এবং ডাউন নির্দেশের সতর্কতা):
+      - DO NOT confuse or invert the prediction directions.
+      - 'Up' means a bullish prediction. Buy/Call signal. Price is expected to go UP. Green candlestick confirmation, support zone bounce, or bullish breakout.
+      - 'Down' means a bearish prediction. Sell/Put signal. Price is expected to go DOWN. Red candlestick confirmation, resistance zone rejection, or bearish breakdown.
+      - Carefully verify the trend on the right side of the chart (latest candles). If the latest price action is breaking resistance upwards, the prediction is 'Up'. If the latest price action is breaking support downwards, the prediction is 'Down'.
+      - Check that all prices align with the prediction direction:
+        * For 'Up' predictions, 'priceCloseUpEntry' must be higher than current price, 'suggestedTakeProfit' must be higher than entry, and 'suggestedStopLoss' must be lower than entry.
+        * For 'Down' predictions, 'priceCloseDownEntry' must be lower than current price, 'suggestedTakeProfit' must be lower than entry, and 'suggestedStopLoss' must be higher than entry.
     `;
 
     if (precision === "sureshot") {
