@@ -1,10 +1,12 @@
 {
   "registeredUsers": {
     "limon258144@gmail.com": "google-oauth",
-    "admin": "admin123"
+    "admin": "admin123",
+    "000@gmail.com": "00000"
   },
   "activeSessions": {
-    "limon258144@gmail.com": 1783363614143
+    "limon258144@gmail.com": 1783423512085,
+    "000@gmail.com": 1783423353858
   },
   "proUsers": [],
   "submittedPayments": [],
@@ -41,5 +43,7 @@
     "nila_custom_ltc_v1": "01568760651",
     "nila_custom_bkash_inst_v1": "* এই বিকাশ পার্সোনাল নাম্বারে সমপরিমাণ টাকা Send Money করুন।",
     "nila_custom_crypto_inst_v1": "* Send exactly the payment amount to this receiver wallet."
-  }
+  },
+  "deletedPayments": [],
+  "deletedUsers": []
 }

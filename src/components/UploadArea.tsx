@@ -1,7 +1,6 @@
-import React, { useRef, useState } from "react";
-import { UploadCloud, Image as ImageIcon, Sparkles, TrendingUp } from "lucide-react";
+import React, { useRef, useState, useEffect } from "react";
+import { UploadCloud, Image as ImageIcon, Sparkles } from "lucide-react";
 import { translations, Language } from "../utils/translations";
-import { sampleCharts } from "../utils/samples";
 // @ts-ignore
 import tradeLensLogo from "../assets/images/tradelens_logo_1782904706226.jpg";
 
@@ -17,6 +16,7 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing, isP
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragActive, setIsDragActive] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [pasteText, setPasteText] = useState("");
 
   // Client-side image resize and compression helper to reduce base64 footprint (extremely fast)
   const compressAndResizeImage = (dataUrl: string, callback: (compressed: string) => void) => {
@@ -71,6 +71,128 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing, isP
     };
     reader.readAsDataURL(file);
   };
+
+  const handleTextInputPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (isAnalyzing) return;
+
+    const files = e.clipboardData?.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.type.startsWith("image/")) {
+        e.preventDefault();
+        processFile(file);
+        return;
+      }
+    }
+
+    const items = e.clipboardData?.items;
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf("image") !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            e.preventDefault();
+            processFile(file);
+            return;
+          }
+        }
+      }
+    }
+
+    const pastedText = e.clipboardData?.getData("text") || "";
+    if (pastedText.trim()) {
+      const trimmed = pastedText.trim();
+      if (trimmed.startsWith("data:image/")) {
+        e.preventDefault();
+        setLocalError(null);
+        compressAndResizeImage(trimmed, (compressedData) => {
+          onImageSelected(compressedData, "pasted-image.png");
+        });
+        setPasteText("");
+      } else if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+        e.preventDefault();
+        setLocalError(null);
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0);
+            try {
+              const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+              compressAndResizeImage(dataUrl, (compressedData) => {
+                onImageSelected(compressedData, "pasted-url.jpg");
+              });
+            } catch (err) {
+              onImageSelected(trimmed, "pasted-url.jpg");
+            }
+          } else {
+            onImageSelected(trimmed, "pasted-url.jpg");
+          }
+        };
+        img.onerror = () => {
+          onImageSelected(trimmed, "pasted-url.jpg");
+        };
+        img.src = trimmed;
+        setPasteText("");
+      }
+    }
+  };
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setPasteText(val);
+    const trimmed = val.trim();
+    if (trimmed.startsWith("data:image/") || trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      if (trimmed.startsWith("data:image/")) {
+        compressAndResizeImage(trimmed, (compressedData) => {
+          onImageSelected(compressedData, "pasted-image.png");
+        });
+        setPasteText("");
+      } else if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+        onImageSelected(trimmed, "pasted-url.jpg");
+        setPasteText("");
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (isAnalyzing) return;
+      
+      const files = e.clipboardData?.files;
+      if (files && files.length > 0) {
+        const file = files[0];
+        if (file.type.startsWith("image/")) {
+          e.preventDefault();
+          processFile(file);
+          return;
+        }
+      }
+
+      const items = e.clipboardData?.items;
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf("image") !== -1) {
+            const file = items[i].getAsFile();
+            if (file) {
+              e.preventDefault();
+              processFile(file);
+              break;
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => {
+      window.removeEventListener("paste", handlePaste);
+    };
+  }, [isAnalyzing, language, onImageSelected]);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -193,6 +315,13 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing, isP
           {t.uploadHelp}
         </p>
 
+        <div className="mt-3 flex items-center gap-1.5 bg-indigo-500/10 text-indigo-400 px-3.5 py-1.5 rounded-full border border-indigo-500/20 text-[10px] sm:text-xs font-black tracking-wide uppercase shadow-sm group-hover:bg-indigo-500/15 transition-all duration-300">
+          <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+          <span>
+            {language === "bn" ? "কিবোর্ড থেকে সরাসরি Ctrl+V চেপে ইমেজ পেস্ট করুন" : "Press Ctrl+V to Paste Image directly"}
+          </span>
+        </div>
+
         {localError && (
           <p className="text-xs text-rose-400 max-w-sm mt-3 font-bold bg-rose-950/20 px-3 py-1.5 rounded-xl border border-rose-500/25 animate-bounce">
             ⚠️ {localError}
@@ -208,60 +337,41 @@ export default function UploadArea({ onImageSelected, language, isAnalyzing, isP
         )}
       </div>
 
-
-
-      {/* Dynamic Demo Candlestick Patterns Picker */}
+      {/* Paste Image Box below Drop Zone */}
       <div 
-        id="sample-picker-section" 
-        className={`transition-all duration-500 border-2 rounded-3xl p-5 ${
+        id="image-paste-container"
+        className={`border-2 rounded-3xl p-5 transition-all duration-300 ${
           isProUser
-            ? "bg-[#16122d]/75 border-[#a855f7]/40 shadow-[0_0_20px_rgba(168,85,247,0.12)] backdrop-blur-md"
-            : "bg-[#111116] border-slate-800"
+            ? "bg-[#16122d]/40 border-[#a855f7]/30 hover:border-[#a855f7]/55 shadow-[0_0_15px_rgba(168,85,247,0.06)]"
+            : "bg-[#111116] border-indigo-500/10 hover:border-indigo-500/30"
         }`}
       >
-        <h4 className="text-white font-display font-black text-sm mb-1 flex items-center gap-2">
-          <TrendingUp className={`w-5 h-5 ${isProUser ? "text-emerald-450" : "text-emerald-450"}`} />
-          {t.sampleCharts}
-        </h4>
-        <p className="text-xs text-slate-400 mb-4 font-medium">{t.sampleDesc}</p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {sampleCharts.map((sample) => (
-            <button
-              id={`sample-chart-btn-${sample.id}`}
-              key={sample.id}
-              onClick={() => onImageSelected(sample.dataUrl, `${sample.id}.png`)}
-              className={`group text-left rounded-2xl p-3 transition-all duration-200 flex flex-col items-start gap-2 overflow-hidden active:scale-95 border ${
-                isProUser
-                  ? "bg-[#0c0a18] border-[#a855f7]/20 hover:border-[#a855f7]/70 hover:bg-[#1a1538]"
-                  : "bg-slate-950 border-slate-800 hover:border-indigo-500/50 hover:bg-[#141419]"
-              }`}
-              title={t[sample.titleKey]}
-              disabled={isAnalyzing}
-            >
-              <div className={`w-full rounded-xl overflow-hidden aspect-[16/9] border ${
-                isProUser ? "bg-[#080710] border-[#a855f7]/15" : "bg-[#111114] border-slate-850"
-              }`}>
-                <img
-                  src={sample.dataUrl}
-                  alt={t[sample.titleKey]}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-              <div className="w-full">
-                <p className={`text-xs font-black truncate transition-colors ${
-                  isProUser ? "text-[#e9d5ff] group-hover:text-amber-300" : "text-slate-200 group-hover:text-amber-400"
-                }`}>
-                  {t[sample.titleKey]}
-                </p>
-                <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest font-bold block">
-                  {language === "bn" ? "ডেমো চার্ট প্রস্তুত" : "Demo Chart Ready"}
-                </span>
-              </div>
-            </button>
-          ))}
+        <div className="flex items-center gap-2 mb-3 select-none">
+          <ImageIcon className="w-4.5 h-4.5 text-indigo-400" />
+          <span className="text-white font-black text-xs sm:text-sm">
+            {language === "bn" ? "কপি করা ইমেজ সরাসরি পেস্ট করুন" : "Paste Copied Image/URL Directly"}
+          </span>
+          <span className="text-[9px] font-mono text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded-md font-bold ml-auto uppercase tracking-wide">
+            Ctrl + V Supported
+          </span>
         </div>
+        
+        <textarea
+          id="image-paste-box"
+          rows={3}
+          value={pasteText}
+          onChange={handleTextChange}
+          onPaste={handleTextInputPaste}
+          disabled={isAnalyzing}
+          placeholder={translations[language].pastePlaceholder}
+          className="w-full bg-[#0d0d12] text-slate-200 placeholder:text-slate-600 border border-slate-800/80 focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 rounded-2xl px-4 py-3.5 text-xs font-medium outline-none resize-none transition duration-150"
+        />
+        
+        <p className="text-[10px] text-slate-500 font-bold select-none block mt-2 text-left leading-relaxed">
+          {language === "bn"
+            ? "* কম্পিউটার বা ফোন থেকে কোনো চার্ট ছবি বা স্ক্রিনশট কপি (Copy) করে এই টেক্সট বক্সে ক্লিক দিয়ে কিবোর্ড থেকে Ctrl+V প্রেস করুন। অথবা সরাসরি ছবির লিঙ্ক (URL) এখানে পেস্ট করুন।"
+            : "* Copy any chart image or screenshot to clipboard, click inside the box above, and press Ctrl+V to import. Direct image URLs or Base64 data are also supported."}
+        </p>
       </div>
     </div>
   );

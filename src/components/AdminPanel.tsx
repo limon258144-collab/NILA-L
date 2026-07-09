@@ -30,7 +30,7 @@ interface AdminPanelProps {
 
 export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<"payments" | "support" | "users">("users");
-  const [userSubFilter, setUserSubFilter] = useState<"all" | "verified" | "pending" | "expired" | "unverified">("all");
+  const [userSubFilter, setUserSubFilter] = useState<"all" | "verified" | "pending" | "expired" | "unverified" | "online">("all");
   const [searchQuery, setSearchQuery] = useState("");
   
   // App variables/settings form state
@@ -488,6 +488,13 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
   const expiredCount = expiredTrialList.length;
   const unverifiedCount = Math.max(0, totalUsersCount - verifiedCount - expiredCount);
 
+  // Live online active users count
+  const onlineCount = Object.keys(activeSessions).filter(u => {
+    const lower = u.toLowerCase();
+    if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
+    return isUserRegisteredTodayOnwards(u);
+  }).length;
+
   const getDaysUsedForUser = (un: string): number => {
     if (un === "limon") return 49;
     if (un === "limon44@gmail.com") return 4;
@@ -546,6 +553,9 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
     if (userSubFilter === "expired") {
       const limitArr = analysisLimits[un] || [];
       return !checkUserProStatus(un) && limitArr.length >= 3;
+    }
+    if (userSubFilter === "online") {
+      return activeSessions[un] !== undefined;
     }
     return true;
   });
@@ -734,8 +744,8 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
       {activeTab === "users" && (
         <div className="space-y-5">
           
-          {/* Counters Row Card block exactly matching screenshot */}
-          <div className="grid grid-cols-3 gap-2.5">
+          {/* Counters Row Card block with 4-column layout including Online members */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
             {/* Card 1: প্রো একটিভ মেম্বার */}
             <div 
               onClick={() => {
@@ -778,7 +788,34 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
               </div>
             </div>
 
-            {/* Card 3: ফ্রি ট্রায়াল শেষ মেম্বার */}
+            {/* Card 3: লাইভ অনলাইন মেম্বার */}
+            <div 
+              onClick={() => {
+                setUserSubFilter("online");
+                playChime();
+              }}
+              className={`border rounded-2xl p-3 flex items-center justify-between shadow transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-95 ${
+                userSubFilter === "online"
+                  ? "bg-amber-950/20 border-amber-500/60 shadow-amber-900/10"
+                  : "bg-[#111116] border-amber-500/20 hover:border-amber-500/40"
+              }`}
+            >
+              <div className="text-left bg-transparent">
+                <span className="text-[10px] font-bold text-slate-400 block bg-transparent">৩. লাইভ অনলাইন</span>
+                <span className="text-base sm:text-lg font-black text-amber-400 block mt-0.5 bg-transparent flex items-center gap-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  {getBngNum(onlineCount)} জন
+                </span>
+              </div>
+              <div className="bg-amber-500/10 p-1.5 rounded-xl text-amber-400 shrink-0">
+                <Wifi className="w-4.5 h-4.5 animate-pulse" />
+              </div>
+            </div>
+
+            {/* Card 4: ফ্রি ট্রায়াল শেষ মেম্বার */}
             <div 
               onClick={() => {
                 setUserSubFilter("expired");
@@ -791,7 +828,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
               }`}
             >
               <div className="text-left bg-transparent">
-                <span className="text-[10px] font-bold text-slate-400 block bg-transparent">৩. ফ্রি ট্রায়াল শেষ</span>
+                <span className="text-[10px] font-bold text-slate-400 block bg-transparent">৪. ফ্রি ট্রায়াল শেষ</span>
                 <span className="text-base sm:text-lg font-black text-rose-400 block mt-0.5 bg-transparent">{getBngNum(expiredCount)} জন</span>
               </div>
               <div className="bg-rose-500/10 p-1.5 rounded-xl text-rose-400 shrink-0">
@@ -830,6 +867,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
                 {[
                   { id: "all", label: `সবাই (${totalUsersCount})` },
                   { id: "verified", label: `ভেরিফাইড (${verifiedCount})` },
+                  { id: "online", label: `অনলাইন (${onlineCount}) 🟢` },
                   { id: "pending", label: `পেন্ডিং (${submittedPayments.filter(p => p.status === "pending").length})` },
                   { id: "expired", label: `ট্রায়াল শেষ (${expiredCount})` },
                   { id: "unverified", label: `ফ্রি/সক্রিয় (${unverifiedCount})` }
@@ -896,12 +934,13 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
                           <div className="flex items-center gap-2.5">
                             <div className="relative">
                               <div className="w-9 h-9 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center font-black text-xs text-indigo-400 uppercase">
-                                {uid ? uid.charAt(0) : "U"}
+                                {un ? un.charAt(0) : "U"}
                               </div>
                               <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[#111116] ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-slate-600"}`} />
                             </div>
                             <div className="text-left leading-tight">
-                              <span className="font-mono font-extrabold text-white text-xs block max-w-[150px] truncate">{uid}</span>
+                              <span className="font-bold text-slate-200 text-xs block max-w-[155px] truncate" title={un}>{un}</span>
+                              <span className="font-mono text-[9.5px] text-slate-500 block max-w-[155px] truncate">{uid}</span>
                             </div>
                           </div>
                         </td>
@@ -915,8 +954,19 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
                         </td>
 
                         {/* Column 3: Last Login */}
-                        <td className="py-3 px-2 text-slate-400 font-bold text-[11px]">
-                          {stats.last}
+                        <td className="py-3 px-2">
+                          <div className="flex flex-col gap-1 items-start">
+                            {isOnline ? (
+                              <span className="inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wide animate-pulse">
+                                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> ONLINE
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1.5 bg-slate-500/10 text-slate-400 border border-slate-500/10 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wide">
+                                <span className="h-1.5 w-1.5 rounded-full bg-slate-500"></span> LOGGED OUT
+                              </span>
+                            )}
+                            <span className="text-slate-400 font-bold text-[11px] block mt-0.5">{stats.last}</span>
+                          </div>
                         </td>
 
                         {/* Column 4: Verification Status & Time */}

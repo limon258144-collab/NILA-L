@@ -260,14 +260,33 @@ app.post("/api/analyze", async (req, res): Promise<any> => {
       return res.status(400).json({ error: "Image data is required" });
     }
 
-    // Parse data URL to get mimetype and raw base64 data
-    const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) {
-      return res.status(400).json({ error: "Invalid image format. Expected helper Base64 Data URL." });
-    }
+    let mimeType = "";
+    let base64Data = "";
 
-    const mimeType = matches[1];
-    const base64Data = matches[2];
+    if (image.startsWith("http://") || image.startsWith("https://")) {
+      try {
+        const fetchRes = await fetch(image);
+        if (!fetchRes.ok) {
+          return res.status(400).json({ error: `Failed to fetch image from URL: ${fetchRes.statusText}` });
+        }
+        const arrayBuffer = await fetchRes.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        base64Data = buffer.toString("base64");
+        
+        const contentType = fetchRes.headers.get("content-type");
+        mimeType = contentType && contentType.startsWith("image/") ? contentType : "image/jpeg";
+      } catch (err: any) {
+        return res.status(400).json({ error: `Failed to load image from URL: ${err.message}` });
+      }
+    } else {
+      // Parse data URL to get mimetype and raw base64 data
+      const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (!matches || matches.length !== 3) {
+        return res.status(400).json({ error: "Invalid image format. Expected helper Base64 Data URL." });
+      }
+      mimeType = matches[1];
+      base64Data = matches[2];
+    }
 
     const ai = getGenAI();
 
