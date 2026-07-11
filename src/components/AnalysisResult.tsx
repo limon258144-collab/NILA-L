@@ -131,19 +131,21 @@ export default function AnalysisResult({ analysis = {} as TradingAnalysis, langu
         </h4>
         
         {/* Important Time Warning Banner */}
-        <div className="bg-amber-500/10 border border-amber-500/40 rounded-xl p-3 flex items-start gap-2.5 animate-pulse">
-          <span className="text-amber-400 text-base leading-none select-none shrink-0">⚠️</span>
-          <div className="space-y-0.5">
-            <p className="text-amber-300 text-xs sm:text-sm font-black leading-tight">
-              {language === "bn" 
-                ? "পরবর্তী ক্যান্ডেল ১৫ সেকেন্ডের ভেতরে ট্রেড নিতে হবে!" 
-                : "Next candle trade must be taken within 15 seconds!"}
-            </p>
-            <span className="text-[10px] text-slate-400 font-mono block">
-              Execution window: ≤ 15 seconds max
-            </span>
+        {!isNotChart && (
+          <div className="bg-amber-500/10 border border-amber-500/40 rounded-xl p-3 flex items-start gap-2.5 animate-pulse">
+            <span className="text-amber-400 text-base leading-none select-none shrink-0">⚠️</span>
+            <div className="space-y-0.5">
+              <p className="text-amber-300 text-xs sm:text-sm font-black leading-tight">
+                {language === "bn" 
+                  ? "পরবর্তী ক্যান্ডেল ১৫ সেকেন্ডের ভেতরে ট্রেড নিতে হবে!" 
+                  : "Next candle trade must be taken within 15 seconds!"}
+              </p>
+              <span className="text-[10px] text-slate-400 font-mono block">
+                Execution window: ≤ 15 seconds max
+              </span>
+            </div>
           </div>
-        </div>
+        )}
         
         <div className="space-y-3 text-xs sm:text-sm text-slate-200 font-semibold leading-relaxed">
           {resistancePrice !== "N/A" && (

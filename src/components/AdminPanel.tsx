@@ -178,8 +178,15 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
 
   useEffect(() => {
     loadData();
+    syncWithServer();
+    const intervalId = setInterval(() => {
+      syncWithServer();
+    }, 5000);
     window.addEventListener("nila_settings_updated", loadData);
-    return () => window.removeEventListener("nila_settings_updated", loadData);
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("nila_settings_updated", loadData);
+    };
   }, []);
 
   const checkUserProStatus = (un: string): boolean => {
