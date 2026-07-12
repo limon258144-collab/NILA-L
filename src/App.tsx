@@ -645,6 +645,55 @@ export default function App() {
   const generateLocalTechnicalAnalysis = (fileName: string): TradingAnalysis => {
     let assetName = "EUR/USD";
     const upperFile = fileName.toUpperCase();
+
+    // Simple heuristic: if the filename suggests a camera capture/photo/image without trading indicators, return NOT_A_CHART
+    const looksLikeNonChart = 
+      upperFile.includes("IMG_") || 
+      upperFile.includes("PHOTO") || 
+      upperFile.includes("SELFIE") || 
+      upperFile.includes("CAMERA") || 
+      upperFile.includes("FACE") ||
+      upperFile.includes("PERSON") ||
+      upperFile.includes("CHAT") ||
+      upperFile.includes("ADMIN") ||
+      upperFile.includes("BKASH") ||
+      upperFile.includes("NAGAD") ||
+      upperFile.includes("PAYMENT") ||
+      // or if it doesn't contain any financial asset words and is just a generic screenshot or image
+      ((upperFile.includes("SCREENSHOT") || upperFile.includes("IMAGE")) && 
+       !upperFile.includes("CHART") && 
+       !upperFile.includes("TRADE") && 
+       !upperFile.includes("POCKET") && 
+       !upperFile.includes("QUOTEX") && 
+       !upperFile.includes("IQ") && 
+       !upperFile.includes("BINANCE") && 
+       !upperFile.includes("BTC") && 
+       !upperFile.includes("ETH") && 
+       !upperFile.includes("USD") && 
+       !upperFile.includes("EUR") && 
+       !upperFile.includes("GBP") && 
+       !upperFile.includes("JPY") && 
+       !upperFile.includes("XAU") && 
+       !upperFile.includes("GOLD"));
+
+    if (looksLikeNonChart) {
+      return {
+        prediction: "NOT_A_CHART",
+        priceCloseUpEntry: "N/A",
+        priceCloseDownEntry: "N/A",
+        confidence: 0,
+        supportLevels: ["N/A"],
+        resistanceLevels: ["N/A"],
+        patternsIdentified: ["Invalid Image / Not a Chart"],
+        reasoning: "The fallback analyzer detected that the uploaded image might not be a valid trading chart.",
+        reasoningBangla: "আপলোডকৃত ছবিটি কোনো ট্রেডিং চার্ট বা ক্যান্ডেলস্টিক গ্রাফ নয়। অনুগ্রহ করে আপনার ট্রেডিং প্ল্যাটফর্মের সঠিক চার্টের স্ক্রিনশট আপলোড করুন।",
+        recommendation: "NO ENTRY (NOT A TRADING CHART)",
+        recommendationBangla: "কোনো এন্ট্রি নেই (ট্রেডিং চার্ট নয়)। সঠিক ফাইন্যান্সিয়াল চার্ট আপলোড করা হলে এখানে সিগন্যাল সিদ্ধান্ত প্রদর্শিত হবে।",
+        riskRewardRatio: "N/A",
+        suggestedStopLoss: "N/A",
+        suggestedTakeProfit: "N/A"
+      };
+    }
     if (upperFile.includes("BTC") || upperFile.includes("BITCOIN")) {
       assetName = "BTC/USDT";
     } else if (upperFile.includes("ETH")) {
@@ -888,7 +937,7 @@ export default function App() {
       })();
 
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("TIMEOUT_FALLBACK")), 5100);
+        setTimeout(() => reject(new Error("TIMEOUT_FALLBACK")), 15000);
       });
 
       let analyzedPayload: TradingAnalysis;

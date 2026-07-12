@@ -1,5 +1,5 @@
 export interface TradingAnalysis {
-  prediction: "Up" | "Down" | "Neutral";
+  prediction: "Up" | "Down" | "Neutral" | "NOT_A_CHART";
   priceCloseUpEntry: string;
   priceCloseDownEntry: string;
   confidence: number;

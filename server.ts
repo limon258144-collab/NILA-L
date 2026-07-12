@@ -294,7 +294,13 @@ app.post("/api/analyze", async (req, res): Promise<any> => {
     let promptText = `
       CRITICAL VALIDATION STEP:
       First, inspect if the uploaded image is indeed a valid financial trading chart, candlestick chart, market asset graph, or trading platform screenshot (e.g., MetaTrader, IQ Option, TradingView, Pocket Option, Binance, line/bar/candle chart, etc.).
-      If the image is NOT a trading chart (for example, if it is a photo of a person, a selfie, a household object, random text, animals, scenery, documents, memes, or anything other than a financial market graph/chart), you MUST strictly set:
+      
+      STRICT ANTI-SPOOF / ANTI-SELFIE CONSTRAINTS:
+      - If the image contains a photo of a person, a human face, a selfie, a video player with a person in it, animals, household objects, general documents, memes, or scenery, it is NOT a trading chart.
+      - If the image is a screenshot of this analysis app itself (containing text like 'PRO FEUCHER ACTIVE KARO', 'SURE SHOT', 'PREDICTION', 'UP / কল ট্রেড', 'DOWN / পুট ট্রেড', 'ক্যান্ডেল ক্লোজিং ট্রেড নির্দেশিকা', or 'Nila' logos), it is NOT a valid trading chart.
+      - A valid trading chart MUST have visible candlestick bars (red and green blocks with wicks) or an active financial line/bar graph taking up the main/majority area of the screen.
+      
+      If the image is NOT a trading chart, you MUST strictly set:
       - 'prediction' to "NOT_A_CHART"
       - 'confidence' to 0
       - 'supportLevels' to ["N/A"]
