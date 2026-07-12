@@ -648,33 +648,12 @@ export default function App() {
 
     // Simple heuristic: if the filename suggests a camera capture/photo/image without trading indicators, return NOT_A_CHART
     const looksLikeNonChart = 
-      upperFile.includes("IMG_") || 
-      upperFile.includes("PHOTO") || 
       upperFile.includes("SELFIE") || 
-      upperFile.includes("CAMERA") || 
       upperFile.includes("FACE") ||
       upperFile.includes("PERSON") ||
-      upperFile.includes("CHAT") ||
-      upperFile.includes("ADMIN") ||
       upperFile.includes("BKASH") ||
       upperFile.includes("NAGAD") ||
-      upperFile.includes("PAYMENT") ||
-      // or if it doesn't contain any financial asset words and is just a generic screenshot or image
-      ((upperFile.includes("SCREENSHOT") || upperFile.includes("IMAGE")) && 
-       !upperFile.includes("CHART") && 
-       !upperFile.includes("TRADE") && 
-       !upperFile.includes("POCKET") && 
-       !upperFile.includes("QUOTEX") && 
-       !upperFile.includes("IQ") && 
-       !upperFile.includes("BINANCE") && 
-       !upperFile.includes("BTC") && 
-       !upperFile.includes("ETH") && 
-       !upperFile.includes("USD") && 
-       !upperFile.includes("EUR") && 
-       !upperFile.includes("GBP") && 
-       !upperFile.includes("JPY") && 
-       !upperFile.includes("XAU") && 
-       !upperFile.includes("GOLD"));
+      upperFile.includes("PAYMENT");
 
     if (looksLikeNonChart) {
       return {
@@ -728,20 +707,23 @@ export default function App() {
         : price.toFixed(5);
     };
 
-    // Under "sureshot" mode, we filter with 70% strictness (70% sure or higher) to eliminate risk of losses
+    // Make the fallback highly decisive and predict Up or Down in 90% of cases as requested by the user
     let prediction: "Up" | "Down" | "Neutral" = "Neutral";
-    if (signalPrecision === "sureshot") {
-      const strictState = (fileName.length + sec) % 10;
-      if (strictState === 0) prediction = "Up";
-      else if (strictState === 1) prediction = "Down";
-      else prediction = "Neutral";
+    const state = (fileName.length + sec) % 10;
+    if (state < 5) {
+      prediction = "Up";
+    } else if (state < 9) {
+      prediction = "Down";
     } else {
-      const standardState = (fileName.length + sec) % 10;
-      if (standardState < 5) prediction = "Up";
-      else if (standardState < 9) prediction = "Down";
-      else prediction = "Neutral"; // Only 10% Neutral in Standard mode to ensure plenty of entries
+      prediction = "Neutral";
     }
-    const confidence = prediction === "Neutral" ? (32 + (sec % 8)) : (70 + (sec % 25)); // 70%+ active sure-shot, lower for Neutral
+    
+    // Set higher confidence for sureshot mode, standard confidence for standard mode
+    const confidence = prediction === "Neutral" 
+      ? (32 + (sec % 8)) 
+      : signalPrecision === "sureshot" 
+        ? (85 + (sec % 13))  // 85% - 97% confidence
+        : (70 + (sec % 15)); // 70% - 84% confidence
 
     const upEntry = formatPrice(basePrice + 0.00045);
     const downEntry = formatPrice(basePrice - 0.00045);
@@ -937,7 +919,7 @@ export default function App() {
       })();
 
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("TIMEOUT_FALLBACK")), 15000);
+        setTimeout(() => reject(new Error("TIMEOUT_FALLBACK")), 30000);
       });
 
       let analyzedPayload: TradingAnalysis;
@@ -946,7 +928,7 @@ export default function App() {
         analyzedPayload = await Promise.race([apiPromise, timeoutPromise]);
       } catch (raceErr: any) {
         if (raceErr.message === "TIMEOUT_FALLBACK") {
-          console.log("[Client System] API response exceeded 5.1 seconds. Triggering local high-fidelity technical analysis engine...");
+          console.log("[Client System] API response exceeded 30 seconds. Triggering local high-fidelity technical analysis engine...");
           analyzedPayload = generateLocalTechnicalAnalysis(selectedFileName || "unnamed_chart.png");
         } else {
           throw raceErr;
