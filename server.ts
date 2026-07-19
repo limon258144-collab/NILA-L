@@ -32,6 +32,7 @@ interface DbState {
   configs: Record<string, string>;
   deletedPayments?: string[];
   deletedUsers?: string[];
+  registrationTimes?: Record<string, number>;
 }
 
 function readDb(): DbState {
@@ -42,6 +43,7 @@ function readDb(): DbState {
       if (db) {
         if (!db.deletedPayments) db.deletedPayments = [];
         if (!db.deletedUsers) db.deletedUsers = [];
+        if (!db.registrationTimes) db.registrationTimes = {};
         if (Array.isArray(db.submittedPayments)) {
           db.submittedPayments = db.submittedPayments.filter((p: any) => {
             return p && p.id && p.id.length > 12 && p.id.split("_").length >= 3;
@@ -63,6 +65,7 @@ function readDb(): DbState {
     configs: {},
     deletedPayments: [],
     deletedUsers: [],
+    registrationTimes: {},
   };
 }
 
@@ -241,6 +244,11 @@ app.post("/api/db/sync", (req, res) => {
     // 7. Merge configs
     if (payload.configs) {
       db.configs = { ...db.configs, ...payload.configs };
+    }
+
+    // 8. Merge registrationTimes
+    if (payload.registrationTimes) {
+      db.registrationTimes = { ...db.registrationTimes, ...payload.registrationTimes };
     }
 
     writeDb(db);

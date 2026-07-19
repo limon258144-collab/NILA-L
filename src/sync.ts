@@ -21,6 +21,7 @@ export async function syncWithServer() {
     const proUsers = JSON.parse(localStorage.getItem("nila_pro_users_v1") || "[]");
     const deletedPayments = JSON.parse(localStorage.getItem("nila_deleted_payments_v1") || "[]");
     const deletedUsers = JSON.parse(localStorage.getItem("nila_deleted_users_v1") || "[]");
+    const registrationTimes = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
 
     const configs: Record<string, string> = {};
     for (const key of CONFIG_KEYS) {
@@ -43,6 +44,7 @@ export async function syncWithServer() {
         configs,
         deletedPayments,
         deletedUsers,
+        registrationTimes,
       }),
     });
 
@@ -88,6 +90,7 @@ export async function syncWithServer() {
     localStorage.setItem("nila_support_chats_v2", JSON.stringify(state.supportChats || {}));
     localStorage.setItem("nila_analysis_limits_v1", JSON.stringify(state.analysisLimits || {}));
     localStorage.setItem("nila_pro_users_v1", JSON.stringify(filteredProUsers));
+    localStorage.setItem("nila_registration_times_v1", JSON.stringify(state.registrationTimes || {}));
 
     if (state.configs) {
       for (const [key, val] of Object.entries(state.configs)) {

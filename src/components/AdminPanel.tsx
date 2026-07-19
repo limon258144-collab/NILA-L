@@ -34,7 +34,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
   const [searchQuery, setSearchQuery] = useState("");
   
   // App variables/settings form state
-  const [adminTelegram, setAdminTelegram] = useState("https://t.me/jayedbhai_12");
+  const [adminTelegram, setAdminTelegram] = useState("https://t.me/TIN_KOMASTER");
   const [adminOwner1, setAdminOwner1] = useState("nila\\ldp.onar");
   const [adminOwner2, setAdminOwner2] = useState("korim debolopar");
   const [adminWinRate, setAdminWinRate] = useState("98%");
@@ -1152,6 +1152,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
                       </div>
                     </th>
                     <th className="py-2.5 px-2">TIMESTAMP</th>
+                    <th className="py-2.5 px-2">GMAIL / USERNAME</th>
                     <th className="py-2.5 px-2">SENDER NUMBER</th>
                     <th className="py-2.5 px-2">TRANSACTION ID</th>
                     <th className="py-2.5 px-2">STATUS</th>
@@ -1178,6 +1179,11 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
                           <span className="block font-bold">{getBngDate(pay.timestamp)}</span>
                           <span className="text-[9px] opacity-80 block">{getBngTime(pay.timestamp)}</span>
                         </div>
+                      </td>
+
+                      {/* Gmail / Username */}
+                      <td className="py-3 px-2 text-indigo-300 font-extrabold font-mono text-[11px] max-w-[120px] truncate" title={pay.username}>
+                        {pay.username}
                       </td>
 
                       {/* Sender Number */}

@@ -325,7 +325,7 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
   };
 
   const openTelegramGroup = () => {
-    window.open("https://t.me/poketbrokar", "_blank");
+    window.open("https://t.me/TIN_KOMASTER", "_blank");
   };
 
   return (

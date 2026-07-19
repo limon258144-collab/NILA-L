@@ -60,7 +60,7 @@ export default function App() {
   const [networkFilter, setNetworkFilter] = useState<"all" | "active">("all");
 
   // App configurations controlled dynamically by the admin
-  const [telegramLink, setTelegramLink] = useState("https://t.me/jayedbhai_12");
+  const [telegramLink, setTelegramLink] = useState("https://t.me/TIN_KOMASTER");
   const [globalAnnouncement, setGlobalAnnouncement] = useState("");
   const [analysisReloadKey, setAnalysisReloadKey] = useState(0);
 
@@ -101,9 +101,9 @@ export default function App() {
   const refreshCustomConfig = () => {
     try {
       let storedTelegram = localStorage.getItem("nila_custom_telegram_v1");
-      if (storedTelegram === "https://t.me/addmineanlice" || storedTelegram === "https://t.me/korimtrader_vip" || !storedTelegram) {
-        storedTelegram = "https://t.me/jayedbhai_12";
-        localStorage.setItem("nila_custom_telegram_v1", "https://t.me/jayedbhai_12");
+      if (storedTelegram === "https://t.me/addmineanlice" || storedTelegram === "https://t.me/korimtrader_vip" || storedTelegram === "https://t.me/jayedbhai_12" || !storedTelegram) {
+        storedTelegram = "https://t.me/TIN_KOMASTER";
+        localStorage.setItem("nila_custom_telegram_v1", "https://t.me/TIN_KOMASTER");
       }
       if (storedTelegram) setTelegramLink(storedTelegram);
 
@@ -1099,9 +1099,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <div 
               onClick={() => {
-                if (currentUser) {
-                  setShowSupportDrawer(true);
-                }
+                window.open("https://t.me/TIN_KOMASTER", "_blank");
               }}
               className="px-2.5 h-8 bg-indigo-600 hover:bg-indigo-500 rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/30 cursor-pointer active:scale-95 transition relative"
               title="Inbox Admin"
@@ -1126,7 +1124,7 @@ export default function App() {
                 </span>
               </h1>
               <span 
-                onClick={() => window.open(telegramLink, "_blank")}
+                onClick={() => window.open("https://t.me/TIN_KOMASTER", "_blank")}
                 className="text-[10.5px] block text-indigo-300 hover:text-indigo-205 cursor-pointer font-bold leading-tight mt-1 hover:underline transition duration-150 active:scale-95"
               >
                 {language === "bn" ? "এটার প্রিমিয়াম ভার্সন চাইলে টেলিগ্রামে মেসেজ দিন" : "Want premium version? Message on Telegram"}
