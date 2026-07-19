@@ -919,7 +919,7 @@ export default function App() {
       })();
 
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("TIMEOUT_FALLBACK")), 30000);
+        setTimeout(() => reject(new Error("TIMEOUT_FALLBACK")), 6000);
       });
 
       let analyzedPayload: TradingAnalysis;
@@ -928,7 +928,7 @@ export default function App() {
         analyzedPayload = await Promise.race([apiPromise, timeoutPromise]);
       } catch (raceErr: any) {
         if (raceErr.message === "TIMEOUT_FALLBACK") {
-          console.log("[Client System] API response exceeded 30 seconds. Triggering local high-fidelity technical analysis engine...");
+          console.log("[Client System] API response exceeded 6 seconds. Triggering local high-fidelity technical analysis engine...");
           analyzedPayload = generateLocalTechnicalAnalysis(selectedFileName || "unnamed_chart.png");
         } else {
           throw raceErr;
