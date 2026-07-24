@@ -30,7 +30,7 @@ interface AdminPanelProps {
 
 export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<"payments" | "support" | "users">("users");
-  const [userSubFilter, setUserSubFilter] = useState<"all" | "verified" | "pending" | "expired" | "unverified" | "online">("all");
+  const [userSubFilter, setUserSubFilter] = useState<"all" | "today" | "verified" | "pending" | "expired" | "unverified" | "online">("all");
   const [searchQuery, setSearchQuery] = useState("");
   
   // App variables/settings form state
@@ -463,46 +463,60 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
     return `${getBngNum(h)}:${getBngNum(m)} ${ampm}`;
   };
 
-  const isUserRegisteredTodayOnwards = (username: string): boolean => {
+  const isUserRegisteredToday = (username: string): boolean => {
     try {
       const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
       const regTime = times[username];
-      const baseline = 1783364400000; // July 6, 2026 12:00:00 PM
-      return typeof regTime === "number" && regTime >= baseline;
+      if (typeof regTime !== "number") return false;
+      const regDate = new Date(regTime);
+      const today = new Date();
+      return (
+        regDate.getFullYear() === today.getFullYear() &&
+        regDate.getMonth() === today.getMonth() &&
+        regDate.getDate() === today.getDate()
+      );
     } catch (e) {
       return false;
     }
   };
 
+  const isUserOnline = (username: string): boolean => {
+    const lastActive = activeSessions[username];
+    if (typeof lastActive !== "number") return false;
+    return (Date.now() - lastActive) <= 15 * 60 * 1000;
+  };
+
   // Calculations for Counters & Statuses
-  const totalUsersCount = Object.keys(users).filter(u => {
+  const validUserKeys = Object.keys(users).filter(u => {
     const lower = u.toLowerCase();
-    if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
-    return isUserRegisteredTodayOnwards(u);
-  }).length;
-  const verifiedList = Object.keys(users).filter(u => {
-    const lower = u.toLowerCase();
-    if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
-    return isUserRegisteredTodayOnwards(u) && checkUserProStatus(u);
+    return lower !== "admin" && lower !== "00000000000" && lower !== "limon258144@gmail.com";
   });
+
+  const todayUsersCount = validUserKeys.filter(u => isUserRegisteredToday(u)).length;
+  const totalUsersCount = validUserKeys.length;
+
+  const verifiedList = validUserKeys.filter(u => checkUserProStatus(u));
   const verifiedCount = verifiedList.length;
-  const expiredTrialList = Object.keys(users).filter(un => {
-    const lower = un.toLowerCase();
-    if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
+
+  const expiredTrialList = validUserKeys.filter(un => {
     const limitArr = analysisLimits[un] || [];
-    return isUserRegisteredTodayOnwards(un) && !checkUserProStatus(un) && limitArr.length >= 3;
+    return !checkUserProStatus(un) && limitArr.length >= 3;
   });
   const expiredCount = expiredTrialList.length;
   const unverifiedCount = Math.max(0, totalUsersCount - verifiedCount - expiredCount);
 
   // Live online active users count
-  const onlineCount = Object.keys(activeSessions).filter(u => {
-    const lower = u.toLowerCase();
-    if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
-    return isUserRegisteredTodayOnwards(u);
-  }).length;
+  const onlineCount = validUserKeys.filter(u => isUserOnline(u)).length;
 
   const getDaysUsedForUser = (un: string): number => {
+    try {
+      const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
+      const regTime = times[un];
+      if (typeof regTime === "number") {
+        const diffMs = Math.max(0, Date.now() - regTime);
+        return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      }
+    } catch (e) {}
     if (un === "limon") return 49;
     if (un === "limon44@gmail.com") return 4;
     if (un === "lxjayed52@gmail.com") return 3;
@@ -526,29 +540,48 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
     return uid;
   };
 
-  // Deterministic user stats
+  // Real-time user registration & online stats
   const getUserStats = (un: string) => {
-    if (un === "limon") return { reg: "১৬ মে, ২০২৬", last: "৫ জুলাই, ২০২৬ ১২:৫৭ AM" };
-    if (un === "limon44@gmail.com") return { reg: "৩০ জুন, ২০২৬", last: "৫ জুলাই, ২০২৬ ১২:২৩ AM" };
-    if (un === "lxjayed52@gmail.com") return { reg: "১ জুলাই, ২০২৬", last: "৪ জুলাই, ২০২৬ ০২:০০ PM" };
-    
-    // Deterministic dates based on username length
-    const day = (un.length * 3) % 28 + 1;
-    const hour = (un.length * 5) % 12 || 1;
-    const min = (un.length * 9) % 60;
-    const regDate = `${getBngNum(day)} জুন, ২০২৬`;
-    const lastLogin = `৫ জুলাই, ২০২৬ ${getBngNum(hour)}:${getBngNum(min.toString().padStart(2, "0"))} AM`;
-    return { reg: regDate, last: lastLogin };
+    let regDateStr = "";
+    try {
+      const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
+      const regTime = times[un];
+      if (typeof regTime === "number") {
+        regDateStr = `${getBngDate(regTime)} (${getBngTime(regTime)})`;
+      } else {
+        regDateStr = "পূর্বের নিবন্ধিত";
+      }
+    } catch (e) {
+      regDateStr = "পূর্বের নিবন্ধিত";
+    }
+
+    let lastActiveStr = "";
+    const lastSession = activeSessions[un];
+    if (typeof lastSession === "number") {
+      const diffSec = Math.floor((Date.now() - lastSession) / 1000);
+      if (diffSec < 60) {
+        lastActiveStr = "এখনই সক্রিয় 🟢";
+      } else if (diffSec < 3600) {
+        lastActiveStr = `${getBngNum(Math.floor(diffSec / 60))} মিনিট আগে`;
+      } else if (diffSec < 86400) {
+        lastActiveStr = `${getBngNum(Math.floor(diffSec / 3600))} ঘণ্টা আগে`;
+      } else {
+        lastActiveStr = `${getBngDate(lastSession)}`;
+      }
+    } else {
+      lastActiveStr = "অফলাইন (লগ আউট)";
+    }
+
+    return { reg: regDateStr, last: lastActiveStr };
   };
 
   // Dynamic queries filtering
-  const filteredUsers = Object.keys(users).filter(un => {
-    const lower = un.toLowerCase();
-    if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
-    if (!isUserRegisteredTodayOnwards(un)) return false;
+  const filteredUsers = validUserKeys.filter(un => {
     const matchesSearch = un.toLowerCase().includes(searchQuery.trim().toLowerCase());
     if (!matchesSearch) return false;
 
+    if (userSubFilter === "today") return isUserRegisteredToday(un);
+    if (userSubFilter === "online") return isUserOnline(un);
     if (userSubFilter === "verified") return checkUserProStatus(un);
     if (userSubFilter === "unverified") {
       const limitArr = analysisLimits[un] || [];
@@ -560,9 +593,6 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
     if (userSubFilter === "expired") {
       const limitArr = analysisLimits[un] || [];
       return !checkUserProStatus(un) && limitArr.length >= 3;
-    }
-    if (userSubFilter === "online") {
-      return activeSessions[un] !== undefined;
     }
     return true;
   });
@@ -751,51 +781,30 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
       {activeTab === "users" && (
         <div className="space-y-5">
           
-          {/* Counters Row Card block with 4-column layout including Online members */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-            {/* Card 1: প্রো একটিভ মেম্বার */}
+          {/* Counters Row Card block with 5-column layout including Online & Today members */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+            {/* Card 1: আজকে নিবন্ধিত */}
             <div 
               onClick={() => {
-                setUserSubFilter("verified");
+                setUserSubFilter("today");
                 playChime();
               }}
               className={`border rounded-2xl p-3 flex items-center justify-between shadow transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-95 ${
-                userSubFilter === "verified"
-                  ? "bg-emerald-950/20 border-emerald-500/60 shadow-emerald-900/10"
-                  : "bg-[#111116] border-emerald-500/20 hover:border-emerald-500/40"
+                userSubFilter === "today"
+                  ? "bg-indigo-950/20 border-indigo-500/60 shadow-indigo-900/10"
+                  : "bg-[#111116] border-indigo-500/20 hover:border-indigo-500/40"
               }`}
             >
               <div className="text-left bg-transparent">
-                <span className="text-[10px] font-bold text-slate-400 block bg-transparent">১. প্রো একটিভ মেম্বার</span>
-                <span className="text-base sm:text-lg font-black text-emerald-400 block mt-0.5 bg-transparent">{getBngNum(verifiedCount)} জন</span>
+                <span className="text-[10px] font-bold text-slate-400 block bg-transparent">১. আজকে নিবন্ধিত</span>
+                <span className="text-base sm:text-lg font-black text-indigo-400 block mt-0.5 bg-transparent">{getBngNum(todayUsersCount)} জন</span>
               </div>
-              <div className="bg-emerald-500/10 p-1.5 rounded-xl text-emerald-400 shrink-0">
-                <ShieldCheck className="w-4.5 h-4.5" />
-              </div>
-            </div>
-
-            {/* Card 2: সর্বমোট রেজিস্টার্ড মেম্বার */}
-            <div 
-              onClick={() => {
-                setUserSubFilter("all");
-                playChime();
-              }}
-              className={`border rounded-2xl p-3 flex items-center justify-between shadow transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-95 ${
-                userSubFilter === "all"
-                  ? "bg-blue-950/20 border-blue-500/60 shadow-blue-900/10"
-                  : "bg-[#111116] border-blue-500/20 hover:border-blue-500/40"
-              }`}
-            >
-              <div className="text-left bg-transparent">
-                <span className="text-[10px] font-bold text-slate-400 block bg-transparent">২. সর্বমোট রেজিস্টার্ড</span>
-                <span className="text-base sm:text-lg font-black text-white block mt-0.5 bg-transparent">{getBngNum(totalUsersCount)} জন</span>
-              </div>
-              <div className="bg-blue-500/10 p-1.5 rounded-xl text-blue-400 shrink-0">
-                <Users className="w-4.5 h-4.5" />
+              <div className="bg-indigo-500/10 p-1.5 rounded-xl text-indigo-400 shrink-0">
+                <Sparkles className="w-4.5 h-4.5" />
               </div>
             </div>
 
-            {/* Card 3: লাইভ অনলাইন মেম্বার */}
+            {/* Card 2: লাইভ অনলাইন */}
             <div 
               onClick={() => {
                 setUserSubFilter("online");
@@ -808,7 +817,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
               }`}
             >
               <div className="text-left bg-transparent">
-                <span className="text-[10px] font-bold text-slate-400 block bg-transparent">৩. লাইভ অনলাইন</span>
+                <span className="text-[10px] font-bold text-slate-400 block bg-transparent">২. লাইভ অনলাইন</span>
                 <span className="text-base sm:text-lg font-black text-amber-400 block mt-0.5 bg-transparent flex items-center gap-1.5">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -822,7 +831,28 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
               </div>
             </div>
 
-            {/* Card 4: ফ্রি ট্রায়াল শেষ মেম্বার */}
+            {/* Card 3: প্রো একটিভ মেম্বার */}
+            <div 
+              onClick={() => {
+                setUserSubFilter("verified");
+                playChime();
+              }}
+              className={`border rounded-2xl p-3 flex items-center justify-between shadow transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-95 ${
+                userSubFilter === "verified"
+                  ? "bg-emerald-950/20 border-emerald-500/60 shadow-emerald-900/10"
+                  : "bg-[#111116] border-emerald-500/20 hover:border-emerald-500/40"
+              }`}
+            >
+              <div className="text-left bg-transparent">
+                <span className="text-[10px] font-bold text-slate-400 block bg-transparent">৩. প্রো একটিভ মেম্বার</span>
+                <span className="text-base sm:text-lg font-black text-emerald-400 block mt-0.5 bg-transparent">{getBngNum(verifiedCount)} জন</span>
+              </div>
+              <div className="bg-emerald-500/10 p-1.5 rounded-xl text-emerald-400 shrink-0">
+                <ShieldCheck className="w-4.5 h-4.5" />
+              </div>
+            </div>
+
+            {/* Card 4: ফ্রি ট্রায়াল শেষ */}
             <div 
               onClick={() => {
                 setUserSubFilter("expired");
@@ -840,6 +870,27 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
               </div>
               <div className="bg-rose-500/10 p-1.5 rounded-xl text-rose-400 shrink-0">
                 <ShieldAlert className="w-4.5 h-4.5" />
+              </div>
+            </div>
+
+            {/* Card 5: সর্বমোট রেজিস্টার্ড */}
+            <div 
+              onClick={() => {
+                setUserSubFilter("all");
+                playChime();
+              }}
+              className={`border rounded-2xl p-3 flex items-center justify-between shadow transition duration-150 cursor-pointer hover:scale-[1.02] active:scale-95 ${
+                userSubFilter === "all"
+                  ? "bg-blue-950/20 border-blue-500/60 shadow-blue-900/10"
+                  : "bg-[#111116] border-blue-500/20 hover:border-blue-500/40"
+              }`}
+            >
+              <div className="text-left bg-transparent">
+                <span className="text-[10px] font-bold text-slate-400 block bg-transparent">৫. সর্বমোট ইউজার</span>
+                <span className="text-base sm:text-lg font-black text-white block mt-0.5 bg-transparent">{getBngNum(totalUsersCount)} জন</span>
+              </div>
+              <div className="bg-blue-500/10 p-1.5 rounded-xl text-blue-400 shrink-0">
+                <Users className="w-4.5 h-4.5" />
               </div>
             </div>
           </div>
@@ -873,8 +924,9 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
               <div className="flex flex-wrap gap-1">
                 {[
                   { id: "all", label: `সবাই (${totalUsersCount})` },
-                  { id: "verified", label: `ভেরিফাইড (${verifiedCount})` },
+                  { id: "today", label: `আজকে নিবন্ধিত (${todayUsersCount}) 🆕` },
                   { id: "online", label: `অনলাইন (${onlineCount}) 🟢` },
+                  { id: "verified", label: `ভেরিফাইড (${verifiedCount})` },
                   { id: "pending", label: `পেন্ডিং (${submittedPayments.filter(p => p.status === "pending").length})` },
                   { id: "expired", label: `ট্রায়াল শেষ (${expiredCount})` },
                   { id: "unverified", label: `ফ্রি/সক্রিয় (${unverifiedCount})` }

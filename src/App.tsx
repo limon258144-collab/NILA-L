@@ -17,7 +17,6 @@ import {
   X,
   Smartphone,
   Sparkles,
-  LogOut,
   ShieldCheck,
   Megaphone,
   Check,
@@ -52,7 +51,6 @@ export default function App() {
   // User Authentication State
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // States to keep track of active sessions and registered users
   const [registeredUsers, setRegisteredUsers] = useState<Record<string, string>>({});
@@ -495,6 +493,22 @@ export default function App() {
       }
     }
   }, [currentUser, showSupportDrawer]);
+
+  // Periodic session heartbeat for logged-in user to maintain live online status
+  useEffect(() => {
+    if (!currentUser) return;
+    const sendSessionHeartbeat = () => {
+      try {
+        const storedSessions = localStorage.getItem("nila_active_sessions_v1");
+        let sessions: Record<string, number> = storedSessions ? JSON.parse(storedSessions) : {};
+        sessions[currentUser] = Date.now();
+        localStorage.setItem("nila_active_sessions_v1", JSON.stringify(sessions));
+      } catch (e) {}
+    };
+    sendSessionHeartbeat();
+    const heartbeatInterval = setInterval(sendSessionHeartbeat, 10000);
+    return () => clearInterval(heartbeatInterval);
+  }, [currentUser]);
 
   useEffect(() => {
     refreshCustomConfig();
@@ -1174,18 +1188,6 @@ export default function App() {
                 title={language === "bn" ? "এডমিন প্যানেল" : "Admin Panel"}
               >
                 <ShieldCheck className="w-4 h-4" />
-              </button>
-            )}
-
-            {/* Log out button when logged-in */}
-            {currentUser && (
-              <button
-                id="logout-btn"
-                onClick={() => setShowLogoutConfirm(true)}
-                className="p-2 rounded-xl bg-rose-950/20 border border-rose-500/25 text-rose-400 hover:text-white hover:bg-rose-900/10 transition active:scale-90 cursor-pointer"
-                title={language === "bn" ? "লগ আউট" : "Log Out"}
-              >
-                <LogOut className="w-4 h-4" />
               </button>
             )}
 
@@ -2347,60 +2349,6 @@ export default function App() {
                 </form>
               )}
 
-            </div>
-          </div>
-        )}
-
-        {/* Custom Logout Confirmation Modal */}
-        {showLogoutConfirm && (
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-            <div className="bg-[#111116] border-2 border-indigo-500/30 rounded-3xl p-6 max-w-xs w-full space-y-4 shadow-2xl text-center">
-              <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/20">
-                <LogOut className="w-6 h-6 animate-pulse" />
-              </div>
-              <div className="space-y-1.5">
-                <h4 className="text-white font-extrabold text-sm uppercase tracking-wide">
-                  {language === "bn" ? "লগ আউট করতে চান?" : "Confirm Logout?"}
-                </h4>
-                <p className="text-slate-400 text-xs leading-relaxed font-semibold">
-                  {language === "bn"
-                    ? "আপনি কি আসলেই ড্যাশবোর্ড থেকে লগ আউট করতে চান?"
-                    : "Are you sure you want to log out of your session?"}
-                </p>
-              </div>
-              <div className="flex gap-2.5 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setShowLogoutConfirm(false)}
-                  className="flex-1 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-350 text-xs font-bold py-2.5 rounded-xl transition duration-150 active:scale-95 cursor-pointer"
-                >
-                  {language === "bn" ? "বাতিল" : "Cancel"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const userToRemove = currentUser;
-                    setCurrentUser(null);
-                    localStorage.removeItem("nila_logged_in_user_v1");
-                    setShowAdminPanel(false);
-                    setShowLogoutConfirm(false);
-                    try {
-                      const storedSessions = localStorage.getItem("nila_active_sessions_v1");
-                      if (storedSessions && userToRemove) {
-                        const sessions = JSON.parse(storedSessions);
-                        delete sessions[userToRemove];
-                        localStorage.setItem("nila_active_sessions_v1", JSON.stringify(sessions));
-                        window.dispatchEvent(new Event("nila_settings_updated"));
-                      }
-                    } catch (err) {
-                      console.error(err);
-                    }
-                  }}
-                  className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold py-2.5 rounded-xl transition duration-150 active:scale-95 cursor-pointer"
-                >
-                  {language === "bn" ? "লগ আউট" : "Log Out"}
-                </button>
-              </div>
             </div>
           </div>
         )}
