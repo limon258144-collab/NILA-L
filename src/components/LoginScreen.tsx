@@ -32,7 +32,7 @@ const GoogleLogomark = () => (
 
 export default function LoginScreen({ onLoginSuccess, language }: LoginScreenProps) {
   // Current active login mode: direct email login / register new account
-  const [activeSegment, setActiveSegment] = useState<"login" | "register">("login");
+  const [activeSegment, setActiveSegment] = useState<"login" | "register">("register");
   
   const [showChooser, setShowChooser] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
@@ -370,20 +370,6 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
           <div className="grid grid-cols-2 bg-slate-950/80 p-1 rounded-2xl border border-slate-800/80 select-none">
             <button
               onClick={() => {
-                setActiveSegment("login");
-                setErrorMsg(null);
-              }}
-              className={`py-2 px-1 text-center rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                activeSegment === "login"
-                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/10"
-                  : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              <Lock className="w-3.5 h-3.5 shrink-0" />
-              <span>{language === "bn" ? "লগইন" : "Login"}</span>
-            </button>
-            <button
-              onClick={() => {
                 setActiveSegment("register");
                 setErrorMsg(null);
               }}
@@ -395,6 +381,20 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
             >
               <User className="w-3.5 h-3.5 shrink-0" />
               <span>{language === "bn" ? "রেজিস্ট্রেশন" : "Register"}</span>
+            </button>
+            <button
+              onClick={() => {
+                setActiveSegment("login");
+                setErrorMsg(null);
+              }}
+              className={`py-2 px-1 text-center rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                activeSegment === "login"
+                  ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/10"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Lock className="w-3.5 h-3.5 shrink-0" />
+              <span>{language === "bn" ? "লগইন" : "Login"}</span>
             </button>
           </div>
         </div>
