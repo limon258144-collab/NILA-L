@@ -5,7 +5,8 @@ import {
   HelpCircle,
   Activity,
   Compass,
-  Ban
+  Ban,
+  AlertTriangle
 } from "lucide-react";
 import { TradingAnalysis } from "../types";
 
@@ -17,8 +18,9 @@ interface Props {
 }
 
 export default function AnalysisResult({ analysis = {} as TradingAnalysis, language, imageFileName, imageDataUrl }: Props) {
-  const isUp = analysis?.prediction?.toLowerCase() === "up";
-  const isDown = analysis?.prediction?.toLowerCase() === "down";
+  const isConfidenceBelow70 = typeof analysis?.confidence === "number" && analysis.confidence < 70;
+  const isUp = analysis?.prediction?.toLowerCase() === "up" && !isConfidenceBelow70;
+  const isDown = analysis?.prediction?.toLowerCase() === "down" && !isConfidenceBelow70;
   const isNotChart = analysis?.prediction?.toLowerCase() === "not_a_chart";
 
   const [telegram, setTelegram] = React.useState("https://t.me/TIN_KOMASTER");
@@ -45,14 +47,16 @@ export default function AnalysisResult({ analysis = {} as TradingAnalysis, langu
 
   // Vibrant compact styling
   let predictionBg = "bg-[#18110b] border-amber-500/30";
-  let predictionText = "text-amber-500 drop-shadow-[0_0_15px_rgba(245,158,11,0.3)] animate-pulse";
-  let predictionLabel = "NO ENTRY (কোনো এন্ট্রি নিবেন না - মার্কেট ঝুঁকিপূর্ণ)";
-  let PredictionIcon = HelpCircle;
+  let predictionText = "text-amber-400 drop-shadow-[0_0_15px_rgba(245,158,11,0.3)] animate-pulse";
+  let predictionLabel = language === "bn" 
+    ? "NO TRADE • MARKET IS RISKY (মার্কেট ঝুঁকিপূর্ণ - লস এড়াতে ট্রেড নিবেন না)" 
+    : "NO TRADE • MARKET IS RISKY (High Loss Risk - Do Not Enter)";
+  let PredictionIcon = AlertTriangle;
 
   if (isNotChart) {
     predictionBg = "bg-[#251213]/95 border-rose-500/40 shadow-[0_0_30px_rgba(244,63,94,0.15)]";
     predictionText = "text-rose-400 drop-shadow-[0_0_15px_rgba(244,63,94,0.45)]";
-    predictionLabel = "NO ENTRY (কোনো এন্ট্রি নেই - এটি ট্রেডিং চার্ট নয়!)";
+    predictionLabel = language === "bn" ? "NO ENTRY (কোনো এন্ট্রি নেই - এটি ট্রেডিং চার্ট নয়!)" : "NO ENTRY (Invalid Image / Not a Chart)";
     PredictionIcon = Ban;
   } else if (isUp) {
     predictionBg = "bg-[#131d1a]/95 border-emerald-500/40";
@@ -89,7 +93,7 @@ export default function AnalysisResult({ analysis = {} as TradingAnalysis, langu
       {/* 1. Next Candle Prediction Header */}
       <div className={`border rounded-2xl p-3.5 ${predictionBg} relative overflow-hidden shadow-sm transition-all duration-300`}>
         <div className="flex items-center gap-3 relative z-10">
-          <div className={`p-2 rounded-xl shrink-0 ${isUp ? "bg-emerald-550/10 text-emerald-400" : isDown ? "bg-rose-550/10 text-rose-400" : "bg-yellow-550/10 text-yellow-500"}`}>
+          <div className={`p-2 rounded-xl shrink-0 ${isUp ? "bg-emerald-550/10 text-emerald-400" : isDown ? "bg-rose-550/10 text-rose-400" : isNotChart ? "bg-rose-550/10 text-rose-400" : "bg-amber-500/15 text-amber-400"}`}>
             <PredictionIcon className="w-7 h-7" />
           </div>
           <div className="min-w-0">
@@ -99,13 +103,17 @@ export default function AnalysisResult({ analysis = {} as TradingAnalysis, langu
             <h2 className={`text-base sm:text-lg font-display font-black tracking-tight mt-0.5 ${predictionText}`}>
               • {predictionLabel}
             </h2>
-            {analysis?.confidence && analysis.confidence >= 70 && (isUp || isDown) && (
+            {analysis?.confidence && analysis.confidence >= 70 && (isUp || isDown) ? (
               <div className="mt-1.5 inline-flex items-center gap-1.5 bg-[#00e676]/15 text-[#00e676] border border-[#00e676]/30 px-2.5 py-0.5 rounded-lg text-[10px] font-mono font-black uppercase tracking-wide">
                 <span className="relative flex h-1.5 w-1.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00e676] opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#00e676]"></span>
                 </span>
-                <span>🔥 ৭০%+ শিউর শট নিশ্চয়তা (70%+ Verified Sure Shot)</span>
+                <span>🔥 ৭০%+ শিউর শট নিশ্চয়তা ({analysis.confidence}% Verified Sure Shot)</span>
+              </div>
+            ) : !isNotChart && (
+              <div className="mt-1.5 inline-flex items-center gap-1.5 bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 rounded-lg text-[10px] font-mono font-black uppercase tracking-wide">
+                <span>⚠️ ৭০% এর নিচে সম্ভাবনা ({analysis?.confidence || 50}%) • লস এড়াতে ট্রেড নিবেন না</span>
               </div>
             )}
           </div>
@@ -126,8 +134,11 @@ export default function AnalysisResult({ analysis = {} as TradingAnalysis, langu
 
       {/* 3. Bangla Candle Closing Guidelines Card */}
       <div className="bg-[#111114] border-2 border-indigo-500/20 rounded-2xl p-4.5 space-y-3">
-        <h4 className="text-indigo-300 font-display font-bold text-xs sm:text-sm tracking-wide border-b border-white/5 pb-2">
-          ★ ক্যান্ডেল ক্লোজিং ট্রেড নির্দেশিকা
+        <h4 className="text-indigo-300 font-display font-bold text-xs sm:text-sm tracking-wide border-b border-white/5 pb-2 flex flex-wrap items-center justify-between gap-1.5">
+          <span>{language === "bn" ? "★ ক্যান্ডেল ক্লোজিং ট্রেড নির্দেশিকা" : "★ Candle Closing Guidelines"}</span>
+          <span className="text-[11px] font-black text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-lg inline-flex items-center gap-1">
+            ⏱️ {language === "bn" ? "৫ মিনিট পর পর ট্রেড নিবেন" : "Take trades every 5 minutes"}
+          </span>
         </h4>
         
         {/* Important Time Warning Banner */}
@@ -148,38 +159,30 @@ export default function AnalysisResult({ analysis = {} as TradingAnalysis, langu
         )}
         
         <div className="space-y-3 text-xs sm:text-sm text-slate-200 font-semibold leading-relaxed">
-          {resistancePrice !== "N/A" && (
-            <div className="bg-emerald-950/15 border border-emerald-500/20 rounded-xl p-3">
-              <span className="text-emerald-400 font-bold block mb-1">UP (বুলিশ) ট্রেড এর নিয়ম:</span>
-              রানিং ক্যান্ডেলটি যদি <strong className="text-emerald-300 font-mono text-sm px-2 py-0.5 bg-slate-950 border border-emerald-500/30 rounded-md select-all">{resistancePrice}</strong> এর উপরে গেলে সরাসরি <strong className="text-emerald-300 font-black">UP ট্রেড নিবেন</strong>।
-            </div>
-          )}
-
-          {supportPrice !== "N/A" && (
-            <div className="bg-rose-950/15 border border-rose-500/20 rounded-xl p-3">
-              <span className="text-rose-400 font-bold block mb-1">DOWN (বেয়ারিশ) ট্রেড এর নিয়ম:</span>
-              রানিং ক্যান্ডেলটি যদি <strong className="text-rose-300 font-mono text-sm px-2 py-0.5 bg-slate-950 border border-rose-500/30 rounded-md select-all">{supportPrice}</strong> এর নিচে গেলে সরাসরি <strong className="text-rose-300 font-black">DOWN ট্রেড নিবেন</strong>।
-            </div>
-          )}
-
-          {supportPrice === "N/A" && resistancePrice === "N/A" && (
+          {(!isUp && !isDown) ? (
             <div className={`border rounded-xl p-4 space-y-2 text-center ${isNotChart ? "bg-rose-950/10 border-rose-500/30" : "bg-[#18110b] border-amber-500/30"}`}>
-              <span className={`font-black text-xs sm:text-sm block ${isNotChart ? "text-rose-450" : "text-amber-500"}`}>
+              <span className={`font-black text-xs sm:text-sm block ${isNotChart ? "text-rose-450" : "text-amber-400"}`}>
                 {isNotChart 
                   ? "❌ NO ENTRY (এটি ট্রেডিং চার্ট নয়) ❌" 
-                  : "⚠️ NO ENTRY (ট্রেড করা থেকে বিরত থাকুন) ⚠️"}
+                  : "⚠️ NO TRADE (মার্কেট ঝুঁকিপূর্ণ - লস এড়াতে ট্রেড বন্ধ রাখুন) ⚠️"}
               </span>
               <p className="text-slate-350 text-xs leading-relaxed">
                 {isNotChart
                   ? (language === "bn"
                       ? "আপনার আপলোডকৃত ফাইলটি একটি সাধারণ ছবি এবং এটি কোনো সঠিক ট্রেডিং চার্ট স্ক্রিনশট নয়। কোনো ভুল এন্ট্রি যাতে না নেওয়া হয় সে জন্য এই সিগন্যালটিকে ব্লক করা হয়েছে। অনুগ্রহ করে একটি সঠিক ক্যান্ডেলস্টিক চার্ট আপলোড করুন।"
                       : "The uploaded file is not a valid trading chart screen or market graph. To prevent any incorrect entries, this signal decision has been blocked. Please upload a proper candlestick chart.")
-                  : (language === "bn"
-                      ? "মার্কেট বর্তমানে চরম অনির্দিষ্ট এবং ঝুঁকিপূর্ণ অবস্থায় রয়েছে। কোনো স্পট বা রিলায়েবল ক্যান্ডেলস্টিক বাউন্স পাওয়া যায়নি। ভুল এন্ট্রি নিয়ে লোকসান এড়াতে এই ক্যান্ডেলে কোনো ট্রেড নিবেন না। অনুগ্রহ করে পরবর্তী ১০০% সিওর শট সিগন্যালের জন্য অপেক্ষা করুন।"
-                      : "The market setup is highly volatile and lacks clear directional movement. Empty or choppy parameters detected. Please do not take any entries now to safeguard your capital. Wait for a clear 100% SURE SHOT confirmation.")
+                  : (analysis?.reasoningBangla || (language === "bn"
+                      ? "চার্ট নিখুঁতভাবে বিশ্লেষণ করে দেখা গেছে মার্কেট বর্তমানে চরম অনির্দিষ্ট ও ঝুঁকিপূর্ণ অবস্থায় রয়েছে। পরবর্তী ক্যান্ডেলে সিগন্যাল সফল হওয়ার সম্ভাবনা ৭০% এর নিচে এবং লস হওয়ার ঝুঁকি রয়েছে। ব্যালেন্স সুরক্ষিত রাখতে এই মুহূর্তে কোনো ট্রেড নিবেন না।"
+                      : "The market setup is highly volatile and lacks 70%+ directional confirmation. To protect your funds against high risk of loss, please do not trade on this candle. Wait for a verified 70%+ Sure Shot confirmation."))
                 }
               </p>
             </div>
+          ) : (
+            analysis?.reasoningBangla && (
+              <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-3 text-xs text-slate-300 leading-relaxed">
+                <p>{analysis.reasoningBangla}</p>
+              </div>
+            )
           )}
         </div>
       </div>

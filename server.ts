@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import dotenv from "dotenv";
 import fs from "fs";
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 
 // Load environment variables
@@ -339,53 +339,133 @@ app.post("/api/analyze", async (req, res): Promise<any> => {
         * For 'Down' predictions, 'priceCloseDownEntry' must be lower than current price, 'suggestedTakeProfit' must be lower than entry, and 'suggestedStopLoss' must be higher than entry.
     `;
 
-    if (precision === "sureshot") {
-      promptText += `
-        You are an expert professional financial analyst, technical researcher, and chart pattern recognition system.
-        Analyze the attached trading chart image meticulously. Follow standard chart reading rules (candlestick structures, support/resistance, trend indicators, relative price volumes, price action levels).
-
-        CRITICAL DECISIVE SURE-SHOT DIRECTIVE (৭০%+ নিশ্চিত সিগন্যাল):
-        - You MUST analyze the trend of the latest candles on the right side and make a clear, decisive prediction of either "Up" (Call/Buy) or "Down" (Put/Sell) with 70% to 100% confidence.
-        - Only return "Neutral" if the image is completely unreadable, has zero price action, or has no candles visible. Do NOT be overly restrictive or afraid of making a prediction. Bengali traders want to know the predicted direction of the NEXT candle!
-        - If you predict "Up", confidence MUST be between 70 to 100. In both 'reasoningBangla' and 'recommendationBangla', you MUST write explicitly: "🔥 এই সিগন্যালে ৭০% এর বেশি শিউর শট সম্ভাবনা রয়েছে" (This signal has an 70%+ sure shot probability) and "৭০%+ নিশ্চিত শিউর শট সিগন্যাল".
-        - If you predict "Down", confidence MUST be between 70 to 100. In both 'reasoningBangla' and 'recommendationBangla', you MUST write explicitly: "🔥 এই সিগন্যালে ৭০% এর বেশি শিউর শট সম্ভাবনা রয়েছে" (This signal has an 70%+ sure shot probability) and "৭০%+ নিশ্চিত শিউর শট সিগন্যাল".
-      `;
-    } else {
-      promptText += `
-        You are an expert professional financial analyst, technical researcher, and chart pattern recognition system.
-        Analyze the attached trading chart image meticulously. Follow standard chart reading rules (candlestick structures, support/resistance, trend indicators, relative price volumes, price action levels).
-
-        STANDARD TRADING MODE DIRECTIVE (বেশি ট্রেড এন্ট্রি এবং সিগন্যাল):
-        - The user is in "STANDARD" mode to get active Buy/Sell signals and frequent entries (বেশি এন্ট্রি সিগন্যাল).
-        - Therefore, do NOT be overly conservative or strict. Be active, predictive, and supportive!
-        - Carefully evaluate the overall trend, support/resistance zones, EMA indicators, and recent price action. Whenever there is a general bias, make a clear decision to predict either "Up" (Bullish/Call) or "Down" (Bearish/Put).
-        - Avoid predicting "Neutral" unless the chart is completely flat, unreadable, or shows absolutely zero movement.
-        - If you predict "Up" or "Down", set your confidence representing the setup strength (typically between 55% to 90%).
-        - In the Bengali 'reasoningBangla' and 'recommendationBangla', formulate actionable recommendations on how the user can enter the trade. Explain the trend simply so they can understand and trade.
-      `;
-    }
-
+    // ULTRA-PRECISE TECHNICAL ANALYSIS PROMPT WITH STRICT 70% LOSS PROTECTION DIRECTIVE
     promptText += `
+      You are an elite, world-class institutional financial analyst, price-action specialist, and algorithmic candlestick pattern recognition engine.
+      Analyze the attached trading chart image with extreme precision and mathematical rigor (অনেক নিখুঁতভাবে মার্কেট অ্যানালাইসিস করুন).
+
+      CRITICAL 70% LOSS-PROTECTION RULE (৭০% এর নিচে হলে লস এড়াতে NO TRADE):
+      - User safety and capital preservation is the TOP priority.
+      - If you judge that the probability of winning the next candle is LESS than 70% (< 70% confidence), OR if the market shows choppiness, uncertainty, wick rejection conflicts, lack of momentum, Doji consolidation, or risk of loss:
+        * You MUST set 'prediction' to "Neutral".
+        * You MUST set 'confidence' to a number below 70 (e.g. 35 to 65).
+        * In 'reasoningBangla' and 'recommendationBangla', you MUST explicitly write:
+          "⚠️ NO TRADE - MARKET IS RISKY (মার্কেট বর্তমানে চরম ঝুঁকিপূর্ণ ও অনির্দিষ্ট)। ক্যান্ডেল সফল হওয়ার সম্ভাবনা ৭০% এর নিচে এবং ট্রেড নিলে লস হওয়ার তীব্র ঝুঁকি রয়েছে। তাই নিজের ব্যালেন্স সুরক্ষিত রাখতে এই মুহূর্তে কোনো ট্রেড নিবেন না।"
+        * In 'recommendation', write: "NO TRADE - MARKET IS RISKY (High risk of loss, setup confidence is below 70%)."
+        * Set 'priceCloseUpEntry' and 'priceCloseDownEntry' to "N/A".
+
+      DECISIVE 70%+ SURE-SHOT RULE (৭০% বা তার বেশি সম্ভাবনা নিশ্চিত হলে তবেই ট্রেড):
+      - ONLY if the technical confluence (Support/Resistance bounce, strong momentum breakout, engulfing candle, rejection wick, EMA trend alignment) provides a 70% to 100% winning probability (≥ 70% confidence):
+        * If bullish confluence: Predict "Up" (Call / Buy), set confidence between 70 and 99. In 'reasoningBangla' and 'recommendationBangla', explain the exact candlestick reason and write: "🔥 এই সিগন্যালে ৭০%+ শিউর শট নিশ্চয়তা রয়েছে।"
+        * If bearish confluence: Predict "Down" (Put / Sell), set confidence between 70 and 99. In 'reasoningBangla' and 'recommendationBangla', explain the exact candlestick reason and write: "🔥 এই সিগন্যালে ৭০%+ শিউর শট নিশ্চয়তা রয়েছে।"
+        * Provide specific breakout / breakdown price levels.
 
       Objectives:
-      1. Carefully inspect recent candles and identify overall trend.
-      2. Provide a prediction of whether the NEXT CANDLE is "Up", "Down", or "Neutral" based on above safety rules. If the image is not a trading chart, return "NOT_A_CHART".
-      3. Define trigger levels or relative zones for "Up" or "Down" inputs. If Neutral or NOT_A_CHART, set to "N/A".
-      4. Detect support and resistance levels. If Neutral or NOT_A_CHART, set to ["N/A"].
-      5. Translate everything beautifully to Bengali (বাংলা) so technical Bengali traders can understand easily. Explain why it is a trade setup or why it is a NO ENTRY.
-      6. Provide SL and TP recommendation. If Neutral or NOT_A_CHART, set to "N/A".
+      1. Meticulously inspect the latest 5-10 candlestick micro-structures, wick lengths, and key levels on the right.
+      2. Strictly apply the 70% threshold: <70% -> "Neutral" (NO TRADE - MARKET IS RISKY), >=70% -> "Up" or "Down".
+      3. If image is not a trading chart, return "NOT_A_CHART".
+      4. Translate technical findings into fluent, crystal-clear Bengali (বাংলা) so traders clearly know if they should take a 70%+ sure shot trade or stay away because market is risky.
 
       Provide your analysis strictly in valid JSON matching the requested response schema format. Do not prepend markdown formatting inside the json fields.
     `;
 
-    // Progressive model fallback list to ensure robustness against high demand / free plan quotas
-    const candidateModels = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+    // Progressive model fallback list prioritizing reliable high-performance multimodal models
+    const candidateModels = [
+      "gemini-2.5-flash",
+      "gemini-2.5-pro",
+      "gemini-3.7-flash",
+      "gemini-2.0-flash",
+      "gemini-flash-latest",
+      "gemini-1.5-flash"
+    ];
     let response = null;
     let lastModelError = null;
 
     for (const modelName of candidateModels) {
       try {
         console.log(`[Server] Attempting technical analysis using model: ${modelName}`);
+        
+        // Configure thinking level HIGH for complex deep reasoning models
+        const modelConfig: any = {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              prediction: {
+                type: Type.STRING,
+                description: "Predicted direction of the next candle: 'Up' (Bullish/Call), 'Down' (Bearish/Put), 'Neutral' (if <70% confidence / risky market), or 'NOT_A_CHART'."
+              },
+              priceCloseUpEntry: {
+                type: Type.STRING,
+                description: "At which closing price or breakout condition should we take an UP trade? Or 'N/A'."
+              },
+              priceCloseDownEntry: {
+                type: Type.STRING,
+                description: "At which closing price or breakdown condition should we take a DOWN trade? Or 'N/A'."
+              },
+              confidence: {
+                type: Type.INTEGER,
+                description: "Confidence level of this prediction (percentage 0 to 100)."
+              },
+              supportLevels: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "Key support levels identified from the chart."
+              },
+              resistanceLevels: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "Key resistance levels identified from the chart."
+              },
+              patternsIdentified: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING },
+                description: "Specific chart pattern, indicator setups, or candlestick formations identified."
+              },
+              reasoning: {
+                type: Type.STRING,
+                description: "Detailed professional technical analysis reasoning in English."
+              },
+              reasoningBangla: {
+                type: Type.STRING,
+                description: "Complete technical analysis reasoning in highly-clear Bengali language (বাংলা) explaining patterns and price action."
+              },
+              recommendation: {
+                type: Type.STRING,
+                description: "Trade execution guidance and warnings in English."
+              },
+              recommendationBangla: {
+                type: Type.STRING,
+                description: "Trade execution guidance and warnings in Bengali language (বাংলা)."
+              },
+              riskRewardRatio: {
+                type: Type.STRING,
+                description: "Suggested Risk-to-Reward ratio (e.g. '1:2', '1:1.5') or 'N/A'."
+              },
+              suggestedStopLoss: {
+                type: Type.STRING,
+                description: "Stop Loss level suggesting where to exit if trade goes wrong, or 'N/A'."
+              },
+              suggestedTakeProfit: {
+                type: Type.STRING,
+                description: "Take Profit level suggesting where to secure gains, or 'N/A'."
+              }
+            },
+            required: [
+              "prediction", "priceCloseUpEntry", "priceCloseDownEntry", "confidence",
+              "supportLevels", "resistanceLevels", "patternsIdentified", "reasoning",
+              "reasoningBangla", "recommendation", "recommendationBangla", "riskRewardRatio",
+              "suggestedStopLoss", "suggestedTakeProfit"
+            ]
+          }
+        };
+
+        if (modelName === "gemini-3.7-flash") {
+          modelConfig.thinkingConfig = {
+            thinkingLevel: ThinkingLevel.HIGH,
+          };
+        }
+
         response = await ai.models.generateContent({
           model: modelName,
           contents: [
@@ -399,79 +479,7 @@ app.post("/api/analyze", async (req, res): Promise<any> => {
               text: promptText,
             },
           ],
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                prediction: {
-                  type: Type.STRING,
-                  description: "Predicted direction of the next candle: 'Up' (Bullish/Call), 'Down' (Bearish/Put), 'Neutral', or 'NOT_A_CHART' (if the uploaded image is not a trading chart)."
-                },
-                priceCloseUpEntry: {
-                  type: Type.STRING,
-                  description: "At which closing price or breakout condition should we take an UP trade? Be highly specific."
-                },
-                priceCloseDownEntry: {
-                  type: Type.STRING,
-                  description: "At which closing price or breakdown condition should we take a DOWN trade? Be highly specific."
-                },
-                confidence: {
-                  type: Type.INTEGER,
-                  description: "Confidence level of this prediction (percentage 0 to 100)."
-                },
-                supportLevels: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING },
-                  description: "Key support levels identified from the chart."
-                },
-                resistanceLevels: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING },
-                  description: "Key resistance levels identified from the chart."
-                },
-                patternsIdentified: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING },
-                  description: "Specific chart pattern, indicator setups, or candlestick formations identified."
-                },
-                reasoning: {
-                  type: Type.STRING,
-                  description: "Detailed professional technical analysis reasoning in English."
-                },
-                reasoningBangla: {
-                  type: Type.STRING,
-                  description: "Complete technical analysis reasoning in highly-clear Bengali language (বাংলা) explaining patterns and price action."
-                },
-                recommendation: {
-                  type: Type.STRING,
-                  description: "Trade execution guidance and warnings in English."
-                },
-                recommendationBangla: {
-                  type: Type.STRING,
-                  description: "Trade execution guidance and warnings in Bengali language (বাংলা)."
-                },
-                riskRewardRatio: {
-                  type: Type.STRING,
-                  description: "Suggested Risk-to-Reward ratio (e.g. '1:2', '1:1.5')."
-                },
-                suggestedStopLoss: {
-                  type: Type.STRING,
-                  description: "Stop Loss level suggesting where to exit if trade goes wrong."
-                },
-                suggestedTakeProfit: {
-                  type: Type.STRING,
-                  description: "Take Profit level suggesting where to secure gains."
-                }
-              },
-              required: [
-                "prediction", "priceCloseUpEntry", "priceCloseDownEntry", "confidence",
-                "supportLevels", "resistanceLevels", "patternsIdentified", "reasoning",
-                "reasoningBangla", "recommendation", "recommendationBangla", "riskRewardRatio",
-                "suggestedStopLoss", "suggestedTakeProfit"
-              ]
-            }
-          }
+          config: modelConfig,
         });
 
         if (response && response.text) {

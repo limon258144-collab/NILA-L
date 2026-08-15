@@ -68,7 +68,7 @@ export default function App() {
   const [showPaymentGateway, setShowPaymentGateway] = useState(false);
   const [walletUSDT, setWalletUSDT] = useState("TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x");
   const [walletTRX, setWalletTRX] = useState("TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x");
-  const [walletLTC, setWalletLTC] = useState("01568760651");
+  const [walletLTC, setWalletLTC] = useState("01767093032");
   const [bkashInstruction, setBkashInstruction] = useState("* এই বিকাশ পার্সোনাল নাম্বারে সমপরিমাণ টাকা Send Money করুন।");
   const [cryptoInstruction, setCryptoInstruction] = useState("* Send exactly the payment amount to this receiver wallet.");
 
@@ -117,11 +117,11 @@ export default function App() {
       if (storedTrx) setWalletTRX(storedTrx);
 
       const storedLtc = localStorage.getItem("nila_custom_ltc_v1");
-      if (storedLtc && storedLtc !== "01700000000") {
+      if (storedLtc && storedLtc !== "01700000000" && storedLtc !== "01568760651") {
         setWalletLTC(storedLtc);
       } else {
-        setWalletLTC("01568760651");
-        localStorage.setItem("nila_custom_ltc_v1", "01568760651");
+        setWalletLTC("01767093032");
+        localStorage.setItem("nila_custom_ltc_v1", "01767093032");
       }
       
       const storedBkashInst = localStorage.getItem("nila_custom_bkash_inst_v1");
@@ -2228,7 +2228,7 @@ export default function App() {
                     </div>
                     
                     <span className="text-[11px] font-bold text-[#e11d48] bg-pink-500/10 px-2.5 py-1 rounded-xl tracking-wide select-none font-mono">
-                      {walletLTC || "01568760651"}
+                      {walletLTC || "01767093032"}
                     </span>
                   </div>
 
@@ -2323,7 +2323,7 @@ export default function App() {
                           onClick={handleCopyWalletAddress}
                           className="w-full bg-slate-950/90 border border-pink-500/20 hover:border-pink-500/50 rounded-xl py-2 px-3 text-[11px] text-pink-400 font-mono font-extrabold select-all cursor-pointer leading-relaxed text-center hover:scale-[1.01] transition shadow-[0_0_10px_rgba(233,30,99,0.03)]"
                         >
-                          {getSelectedWalletAddress() || "01568760651"}
+                          {getSelectedWalletAddress() || "01767093032"}
                         </div>
                       ) : (
                         <div 
