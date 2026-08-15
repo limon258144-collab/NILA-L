@@ -133,7 +133,7 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
     try {
       setUsers(JSON.parse(localStorage.getItem("nila_registered_users_v2") || "{}"));
       const rawPayments = JSON.parse(localStorage.getItem("nila_submitted_payments_v1") || "[]") as any[];
-      const realPayments = rawPayments.filter((p: any) => p && p.id && p.id.length > 12 && p.id.split("_").length >= 3);
+      const realPayments = rawPayments.filter((p: any) => p && p.id && p.id.length >= 8);
       if (rawPayments.length !== realPayments.length) {
         localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(realPayments));
       }
@@ -508,6 +508,8 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
   // Live online active users count
   const onlineCount = validUserKeys.filter(u => isUserOnline(u)).length;
 
+  const adminUnreadTotal = Object.values(supportChats || {}).reduce<number>((acc, c: any) => acc + (Number(c?.unreadCountByAdmin) || 0), 0);
+
   const getDaysUsedForUser = (un: string): number => {
     try {
       const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
@@ -718,36 +720,69 @@ export default function AdminPanel({ language, onBackToApp }: AdminPanelProps) {
           <div className="flex flex-wrap gap-1.5 bg-slate-950/40 p-1 rounded-xl border border-slate-900/60 self-start sm:self-center">
             <button
               onClick={() => { setActiveTab("payments"); setSearchQuery(""); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all duration-150 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all duration-150 cursor-pointer flex items-center gap-1.5 ${
                 activeTab === "payments"
                   ? "bg-blue-600 text-white shadow"
                   : "text-slate-400 hover:text-white"
               }`}
             >
               PAYMENTS
+              {submittedPayments.filter(p => p.status === "pending").length > 0 && (
+                <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded-full animate-bounce">
+                  {submittedPayments.filter(p => p.status === "pending").length}
+                </span>
+              )}
             </button>
             <button
               onClick={() => { setActiveTab("support"); setSearchQuery(""); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all duration-150 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all duration-150 cursor-pointer flex items-center gap-1.5 ${
                 activeTab === "support"
                   ? "bg-indigo-600 text-white shadow"
                   : "text-slate-400 hover:text-white"
               }`}
             >
               SUPPORT
+              {adminUnreadTotal > 0 && (
+                <span className="bg-rose-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full animate-pulse">
+                  {adminUnreadTotal}
+                </span>
+              )}
             </button>
             <button
               onClick={() => { setActiveTab("users"); setSearchQuery(""); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all duration-150 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-black uppercase transition-all duration-150 cursor-pointer flex items-center gap-1.5 ${
                 activeTab === "users"
                   ? "bg-[#f59e0b] text-black shadow"
                   : "text-slate-400 hover:text-white"
               }`}
             >
               USERS ({totalUsersCount})
+              {onlineCount > 0 && (
+                <span className="bg-emerald-500 text-slate-950 text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                  🟢 {onlineCount}
+                </span>
+              )}
             </button>
           </div>
         </div>
+
+        {/* Pending payment quick alert banner */}
+        {submittedPayments.filter(p => p.status === "pending").length > 0 && activeTab !== "payments" && (
+          <div 
+            onClick={() => { setActiveTab("payments"); setSearchQuery(""); }}
+            className="bg-amber-500/15 border border-amber-500/30 text-amber-300 p-2.5 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-amber-500/25 transition animate-pulse"
+          >
+            <div className="flex items-center gap-2 text-left">
+              <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="text-xs font-black">
+                {getBngNum(submittedPayments.filter(p => p.status === "pending").length)} টি নতুন পেমেন্ট ভেরিফিকেশন রিকোয়েস্ট পেন্ডিং আছে!
+              </span>
+            </div>
+            <span className="bg-amber-500 text-black text-[10px] font-black px-2.5 py-1 rounded-xl uppercase">
+              এখনই চেক করুন &gt;
+            </span>
+          </div>
+        )}
 
         {/* Search input inside header bar next to exit */}
         <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-900">

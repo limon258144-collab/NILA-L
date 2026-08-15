@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { syncWithServer } from "../sync";
 import { 
   Lock, 
   User, 
@@ -155,6 +156,12 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
           times[cleanMail] = Date.now();
           localStorage.setItem("nila_registration_times_v1", JSON.stringify(times));
         }
+        
+        // Remove from deletedUsers list if present
+        const deletedUsers: string[] = JSON.parse(localStorage.getItem("nila_deleted_users_v1") || "[]");
+        const filteredDeleted = deletedUsers.filter((u: string) => u.toLowerCase() !== cleanMail.toLowerCase());
+        localStorage.setItem("nila_deleted_users_v1", JSON.stringify(filteredDeleted));
+        syncWithServer();
       } catch (err) {
         console.error(err);
       }
@@ -311,6 +318,11 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
       const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
       times[email] = Date.now();
       localStorage.setItem("nila_registration_times_v1", JSON.stringify(times));
+
+      const deletedUsers: string[] = JSON.parse(localStorage.getItem("nila_deleted_users_v1") || "[]");
+      const filteredDeleted = deletedUsers.filter((u: string) => u.toLowerCase() !== email.toLowerCase());
+      localStorage.setItem("nila_deleted_users_v1", JSON.stringify(filteredDeleted));
+      syncWithServer();
     } catch (err) {
       console.error(err);
     }

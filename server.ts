@@ -46,7 +46,7 @@ function readDb(): DbState {
         if (!db.registrationTimes) db.registrationTimes = {};
         if (Array.isArray(db.submittedPayments)) {
           db.submittedPayments = db.submittedPayments.filter((p: any) => {
-            return p && p.id && p.id.length > 12 && p.id.split("_").length >= 3;
+            return p && p.id && p.id.length >= 8;
           });
         }
       }
@@ -129,8 +129,13 @@ app.post("/api/db/sync", (req, res) => {
     // 1. Merge registeredUsers
     if (payload.registeredUsers) {
       db.registeredUsers = { ...db.registeredUsers, ...payload.registeredUsers };
+      // Remove newly registered users from deletedUsers
+      for (const un of Object.keys(payload.registeredUsers)) {
+        db.deletedUsers = (db.deletedUsers || []).filter(u => u.toLowerCase() !== un.toLowerCase());
+      }
     }
-    for (const un of mergedDeletedUsers) {
+    const activeDeletedUsers = (db.deletedUsers || []);
+    for (const un of activeDeletedUsers) {
       delete db.registeredUsers[un];
     }
 
@@ -200,7 +205,7 @@ app.post("/api/db/sync", (req, res) => {
         paymentMap.delete(pId);
       }
       db.submittedPayments = Array.from(paymentMap.values()).filter((p: any) => {
-        return p && p.id && p.id.length > 12 && p.id.split("_").length >= 3 && !mergedDeletedUsers.includes(p.username);
+        return p && p.id && p.id.length >= 8 && !activeDeletedUsers.includes(p.username);
       });
     }
 

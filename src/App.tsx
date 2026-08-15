@@ -75,7 +75,7 @@ export default function App() {
   // Payment workflow states
   const [selectedNetwork, setSelectedNetwork] = useState<string>("bKash (বিকাশ)");
   const [payAmount, setPayAmount] = useState<string>("20.00");
-  const [senderNumber, setSenderNumber] = useState<string>("01568760651");
+  const [senderNumber, setSenderNumber] = useState<string>("");
   const [txID, setTxID] = useState<string>("");
   const [isVerifyingTx, setIsVerifyingTx] = useState<boolean>(false);
   const [verificationStep, setVerificationStep] = useState<number>(0);
@@ -205,69 +205,84 @@ export default function App() {
     setPaySuccess(null);
 
     if (!selectedNetwork) {
-      setPayError(language === "bn" ? "দয়া করে পেমেন্ট নেটওয়ার্ক নির্বাচন করুন" : "Please select a payment network");
+      setPayError(language === "bn" ? "দয়া করে পেমেন্ট মেথড নির্বাচন করুন" : "Please select a payment method");
       return;
     }
 
-    const numericAmount = parseFloat(payAmount);
-    if (isNaN(numericAmount) || numericAmount < 5.0) {
-      setPayError(language === "bn" ? "সর্বনিম্ন ডিপোজিট পরিমাণ ৫.০০ USD" : "Minimum deposit amount is $5.00");
+    const cleanSender = senderNumber.trim();
+    if (!cleanSender) {
+      setPayError(
+        selectedNetwork === "bKash (বিকাশ)"
+          ? (language === "bn" ? "আপনার বিকাশ প্রেরক নম্বরটি লিখুন" : "Please enter your bKash phone number")
+          : (language === "bn" ? "আপনার প্রেরক নম্বর বা ওয়ালেট ঠিকানা দিন" : "Please enter your sender number / wallet")
+      );
       return;
     }
 
     const cleanTx = txID.trim();
     if (!cleanTx) {
-      setPayError(language === "bn" ? "লেনদেনের হ্যাস আইডি বা TRX ID প্রদান করুন" : "Please enter your transaction ID (TRX/Hash)");
+      setPayError(language === "bn" ? "লেনদেনের TrxID বা ট্রানজেকশন আইডি প্রদান করুন" : "Please enter your transaction ID (TrxID)");
       return;
     }
+
+    const numericAmount = parseFloat(payAmount) || 20.0;
 
     setIsVerifyingTx(true);
     setVerificationStep(1);
 
     setTimeout(() => {
-      setVerificationStep(2);
-      
-      setTimeout(() => {
+      try {
+        const targetUsername = currentUser || "unknown";
+        
+        // Clear target user from deletedUsers locally if present
         try {
-          const currentPaymentsStr = localStorage.getItem("nila_submitted_payments_v1") || "[]";
-          const payments = JSON.parse(currentPaymentsStr);
-          const isBkash = selectedNetwork === "bKash (বিকাশ)";
-          const payItem = {
-            id: "pay_" + Date.now() + "_" + Math.floor(Math.random() * 1000),
-            username: currentUser || "unknown",
-            paymentMethod: isBkash ? "bKash" : "crypto",
-            network: selectedNetwork,
-            amount: numericAmount,
-            transactionId: cleanTx,
-            senderNumber: senderNumber,
-            timestamp: Date.now(),
-            status: "pending"
-          };
-          payments.push(payItem);
-          localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(payments));
-          syncWithServer();
+          const deletedUsers: string[] = JSON.parse(localStorage.getItem("nila_deleted_users_v1") || "[]");
+          const filteredDeleted = deletedUsers.filter((u: string) => u.toLowerCase() !== targetUsername.toLowerCase());
+          localStorage.setItem("nila_deleted_users_v1", JSON.stringify(filteredDeleted));
+        } catch (e) {}
+
+        const currentPaymentsStr = localStorage.getItem("nila_submitted_payments_v1") || "[]";
+        const payments = JSON.parse(currentPaymentsStr);
+        const isBkash = selectedNetwork === "bKash (বিকাশ)";
+        const payItem = {
+          id: "pay_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
+          username: targetUsername,
+          paymentMethod: isBkash ? "bKash" : "crypto",
+          network: selectedNetwork,
+          amount: numericAmount,
+          transactionId: cleanTx,
+          senderNumber: cleanSender,
+          timestamp: Date.now(),
+          status: "pending"
+        };
+        
+        // Add payment item and immediately persist and sync
+        payments.push(payItem);
+        localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(payments));
+        
+        window.dispatchEvent(new Event("nila_settings_updated"));
+        syncWithServer().then(() => {
           refreshCustomConfig();
-          
-          setIsVerifyingTx(false);
-          setVerificationStep(0);
-          setTxID("");
-          setSenderNumber("");
-          setPaySuccess(
-            language === "bn"
-              ? "পেমেন্ট রিকোয়েস্ট সফলভাবে অ্যাডমিন প্যানেলে পাঠানো হয়েছে! অ্যাডমিন এ্যাপ্রুভ করলেই আপনার অ্যাকাউন্ট ভেরিফাইড হবে এবং ৩০ দিনের জন্য আনলিমিটেড সার্ভিস ব্যবহার করতে পারবেন।"
-              : "Payment request sent to Admin Panel! Once approved by Admin, your account will be verified with 30 days of unlimited access."
-          );
-          
-          playSuccessChime();
-          window.dispatchEvent(new Event("nila_settings_updated"));
-        } catch (err) {
-          console.error(err);
-          setIsVerifyingTx(false);
-          setVerificationStep(0);
-          setPayError("Something went wrong saving your payment.");
-        }
-      }, 1600);
-    }, 1400);
+        });
+        
+        setIsVerifyingTx(false);
+        setVerificationStep(0);
+        setTxID("");
+        setSenderNumber("");
+        setPaySuccess(
+          language === "bn"
+            ? "পেমেন্ট রিকোয়েস্ট সফলভাবে অ্যাডমিন প্যানেলে পাঠানো হয়েছে! অ্যাডমিন এ্যাপ্রুভ করলেই আপনার অ্যাকাউন্ট ভেরিফাইড হবে এবং ৩০ দিনের জন্য আনলিমিটেড সার্ভিস ব্যবহার করতে পারবেন।"
+            : "Payment request sent to Admin Panel! Once approved by Admin, your account will be verified with 30 days of unlimited access."
+        );
+        
+        playSuccessChime();
+      } catch (err) {
+        console.error(err);
+        setIsVerifyingTx(false);
+        setVerificationStep(0);
+        setPayError(language === "bn" ? "পেমেন্ট সংরক্ষণ করতে সমস্যা হয়েছে।" : "Something went wrong saving your payment.");
+      }
+    }, 800);
   };
 
 
@@ -343,7 +358,7 @@ export default function App() {
     try {
       const currentPaymentsStr = localStorage.getItem("nila_submitted_payments_v1") || "[]";
       const payments: any[] = JSON.parse(currentPaymentsStr);
-      return payments.some((p: any) => p && p.username === username && p.status === "pending");
+      return payments.some((p: any) => p && p.username && p.username.toLowerCase() === username.toLowerCase() && p.status === "pending");
     } catch (e) {
       return false;
     }
@@ -2126,6 +2141,20 @@ export default function App() {
                 </div>
               )}
 
+              {hasPendingPayment && !paySuccess && (
+                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs flex items-center gap-2.5 font-semibold animate-fade-in">
+                  <Clock className="w-4 h-4 shrink-0 text-amber-400 animate-pulse" />
+                  <div>
+                    <span className="font-bold block text-amber-200">
+                      {language === "bn" ? "আপনার একটি পেমেন্ট রিকোয়েস্ট পেন্ডিং আছে" : "You have a pending payment request"}
+                    </span>
+                    <span className="text-[10px] text-amber-400/80 font-normal">
+                      {language === "bn" ? "অ্যাডমিন ট্রানজেকশন যাচাই করে দ্রুত প্রো মেম্বারশিপ অ্যাপ্রুভ করবেন।" : "Admin will verify and approve your PRO membership shortly."}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {paySuccess && (
                 <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] flex items-center gap-2 font-semibold animate-fade-in">
                   <Check className="w-4 h-4 shrink-0 text-emerald-455 animate-pulse" />
@@ -2137,26 +2166,32 @@ export default function App() {
               {isVerifyingTx ? (
                 <div className="py-8 flex flex-col items-center justify-center space-y-4 text-center">
                   <div className="relative">
-                    <div className="w-12 h-12 rounded-full border-4 border-indigo-500/10 border-t-indigo-500 animate-spin" />
-                    <Sparkles className="w-4 h-4 text-pink-400 animate-pulse absolute inset-0 m-auto" />
+                    <div className="w-12 h-12 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin" />
+                    <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse absolute inset-0 m-auto" />
                   </div>
                   <div className="space-y-1">
                     <h5 className="font-extrabold text-xs text-white uppercase tracking-wider">
-                      {verificationStep === 1 ? "Broadcasting Block Hash..." : "Verifying nodes consensus..."}
+                      {language === "bn" ? "পেমেন্ট রিকোয়েস্ট পাঠানো হচ্ছে..." : "Submitting payment request..."}
                     </h5>
-                    <p className="text-slate-500 text-[10px] font-mono leading-relaxed">
-                      {verificationStep === 1 
-                        ? "Connecting to TRON decentralized block explorer" 
-                        : "Checking wallet ledger balance transfer confirmations"}
+                    <p className="text-slate-400 text-[10px] font-mono leading-relaxed">
+                      {language === "bn" 
+                        ? "অ্যাডমিন প্যানেলে ট্রানজেকশন ভেরিফিকেশন পাঠানো হচ্ছে" 
+                        : "Connecting and queuing request for admin approval"}
                     </p>
                   </div>
                 </div>
               ) : paySuccess ? (
                 <div className="py-4 space-y-3.5 text-center">
-                  <p className="text-slate-400 text-xs font-medium leading-relaxed">
+                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
+                    <Check className="w-6 h-6 animate-bounce" />
+                  </div>
+                  <h5 className="font-extrabold text-white text-sm">
+                    {language === "bn" ? "পেমেন্ট রিকোয়েস্ট সফলভাবে জমা হয়েছে!" : "Payment Request Submitted Successfully!"}
+                  </h5>
+                  <p className="text-slate-300 text-xs font-medium leading-relaxed px-2">
                     {language === "bn"
-                      ? "পেমেন্ট রিকোয়েস্ট অ্যাডমিন প্যানেলে পাঠানো হয়েছে! অ্যাডমিন প্যানেল থেকে এ্যাপ্রুভ করার পর আপনার অ্যাকাউন্ট ৩০ দিনের জন্য আনলিমিটেড ভেরিফাইড (PRO) হয়ে যাবে।"
-                      : "Your request has been sent to the Admin Panel. Once approved by the admin, your account will be verified for 30 days of unlimited access."}
+                      ? "আপনার TrxID এবং নম্বর অ্যাডমিন প্যানেলে পাঠানো হয়েছে! অ্যাডমিন এ্যাপ্রুভ করার সাথে সাথে আপনার অ্যাকাউন্ট ৩০ দিনের জন্য আনলিমিটেড PRO হয়ে যাবে।"
+                      : "Your TrxID and phone number have been sent to the Admin Panel. Once approved, your account will be upgraded with 30 days of unlimited access."}
                   </p>
                   <button
                     type="button"
@@ -2164,9 +2199,9 @@ export default function App() {
                       setShowPaymentGateway(false);
                       setPaySuccess(null);
                     }}
-                    className="w-full bg-gradient-to-r from-emerald-600 to-indigo-600 text-white font-extrabold text-xs py-2 rounded-xl transition shadow active:scale-95 cursor-pointer"
+                    className="w-full bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-extrabold text-xs py-2.5 rounded-xl transition shadow active:scale-95 cursor-pointer"
                   >
-                    {language === "bn" ? "অ্যানালাইসার প্যানেলে ফিরুন" : "Back to Analyzer"}
+                    {language === "bn" ? "ড্যাশবোর্ডে ফিরুন (Back to Dashboard)" : "Back to Analyzer"}
                   </button>
                 </div>
               ) : (
@@ -2197,13 +2232,13 @@ export default function App() {
                           bKash (Personal)
                         </span>
                         <span className="text-[9px] text-slate-400 font-bold block mt-0.5 bg-transparent">
-                          {language === "bn" ? "বিকাশ পেমেন্টের জন্য সিলেক্ট করুন" : "Select for bKash payment"}
+                          {language === "bn" ? "Send Money করার জন্য সিলেক্ট করুন" : "Select for bKash Send Money"}
                         </span>
                       </div>
                     </div>
                     
                     <span className="text-[11px] font-bold text-[#e11d48] bg-pink-500/10 px-2.5 py-1 rounded-xl tracking-wide select-none font-mono">
-                      {walletLTC || (language === "bn" ? "প্রবেশ করাননি" : "Not Set")}
+                      {walletLTC || "01568760651"}
                     </span>
                   </div>
 
@@ -2276,11 +2311,11 @@ export default function App() {
                     <div className="space-y-1.5 rounded-2xl bg-indigo-950/10 border border-indigo-500/10 p-3 animate-fade-in text-center">
                       <div className="flex items-center justify-between text-[10.5px] bg-transparent">
                         <span className="font-extrabold text-slate-400 uppercase tracking-widest text-[8.5px] font-mono">
-                          {selectedNetwork === "bKash (বিকাশ)" ? "bKash RECEIVER NUMBER" : `${selectedNetwork} ADDRESS`}
+                          {selectedNetwork === "bKash (বিকাশ)" ? "bKash RECEIVER NUMBER (Send Money)" : `${selectedNetwork} ADDRESS`}
                         </span>
                         {walletCopied ? (
                           <span className="text-[#00e676] bg-[#00e676]/10 px-2 py-0.5 rounded font-black text-[8.5px] uppercase tracking-wider">
-                            Copied!
+                            {language === "bn" ? "কপি হয়েছে!" : "Copied!"}
                           </span>
                         ) : (
                           <button
@@ -2288,7 +2323,7 @@ export default function App() {
                             onClick={handleCopyWalletAddress}
                             className="text-sky-400 hover:text-indigo-300 font-extrabold text-[9px] uppercase tracking-wider underline transition cursor-pointer"
                           >
-                            Copy Link
+                            {language === "bn" ? "কপি করুন" : "Copy"}
                           </button>
                         )}
                       </div>
@@ -2298,7 +2333,7 @@ export default function App() {
                           onClick={handleCopyWalletAddress}
                           className="w-full bg-slate-950/90 border border-pink-500/20 hover:border-pink-500/50 rounded-xl py-2 px-3 text-[11px] text-pink-400 font-mono font-extrabold select-all cursor-pointer leading-relaxed text-center hover:scale-[1.01] transition shadow-[0_0_10px_rgba(233,30,99,0.03)]"
                         >
-                          {getSelectedWalletAddress() || "017XXXXXXXX"}
+                          {getSelectedWalletAddress() || "01568760651"}
                         </div>
                       ) : (
                         <div 
@@ -2308,8 +2343,10 @@ export default function App() {
                           {getSelectedWalletAddress()}
                         </div>
                       )}
-                      <p className="text-[9px] text-slate-500 mt-1 font-mono leading-none italic text-center bg-transparent">
-                        {selectedNetwork === "bKash (বিকাশ)" ? bkashInstruction : cryptoInstruction}
+                      <p className="text-[9.5px] text-slate-400 mt-1 font-sans leading-relaxed text-center bg-transparent">
+                        {selectedNetwork === "bKash (বিকাশ)" 
+                          ? (bkashInstruction || "* এই বিকাশ পার্সোনাল নাম্বারে ২৫০০ টাকা Send Money করুন এবং নিচে প্রেরক নম্বর ও TrxID দিন।")
+                          : (cryptoInstruction || "* Send exactly the payment amount to this receiver wallet.")}
                       </p>
                     </div>
                   )}
@@ -2318,13 +2355,13 @@ export default function App() {
                   <div className="grid grid-cols-2 gap-3 pb-1">
                     <div className="space-y-1 text-left bg-transparent">
                       <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest font-mono">
-                        YOUR NUMBER
+                        {selectedNetwork === "bKash (বিকাশ)" ? "YOUR BKASH NUMBER" : "YOUR NUMBER / WALLET"}
                       </label>
                       <input
                         type="text"
                         value={senderNumber}
                         onChange={(e) => setSenderNumber(e.target.value)}
-                        placeholder="017********"
+                        placeholder="01XXXXXXXXX"
                         className="w-full bg-slate-950 border border-slate-805 text-slate-100 text-xs rounded-xl py-2 px-3 focus:outline-none focus:border-indigo-500/40 font-mono font-bold"
                         required
                       />
@@ -2332,13 +2369,13 @@ export default function App() {
 
                     <div className="space-y-1 text-left bg-transparent">
                       <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest font-mono">
-                        TRANSACTION ID
+                        TRANSACTION ID (TrxID)
                       </label>
                       <input
                         type="text"
                         value={txID}
                         onChange={(e) => setTxID(e.target.value)}
-                        placeholder="TrxID"
+                        placeholder="TrxID (যেমন: 8N7A6D5F)"
                         className="w-full bg-slate-950 border border-slate-805 text-slate-100 text-xs rounded-xl py-2 px-3 focus:outline-none focus:border-indigo-500/40 font-mono"
                         required
                       />
@@ -2348,7 +2385,7 @@ export default function App() {
                    {/* Glow active emerald customized submit button */}
                   <button
                     type="submit"
-                    className="w-full bg-[#00e676] hover:bg-[#00c853] text-[#07090e] font-black py-4 px-4 rounded-2xl shadow-[0_4px_24px_rgba(0,230,118,0.45)] transition duration-150 active:scale-95 cursor-pointer uppercase tracking-wider text-xs block text-center font-bold"
+                    className="w-full bg-[#00e676] hover:bg-[#00c853] text-[#07090e] font-black py-3.5 px-4 rounded-2xl shadow-[0_4px_24px_rgba(0,230,118,0.45)] transition duration-150 active:scale-95 cursor-pointer uppercase tracking-wider text-xs block text-center font-bold"
                   >
                     {language === "bn" ? "ভেরিফিকেশন রিকোয়েস্ট পাঠান (SUBMIT REQUEST)" : "SUBMIT VERIFICATION REQUEST (ভেরিফিকেশন পাঠান)"}
                   </button>
