@@ -2,14 +2,52 @@
   "registeredUsers": {
     "limon258144@gmail.com": "google-oauth",
     "admin": "admin123",
-    "000@gmail.com": "00000"
+    "000@gmail.com": "00000",
+    "00l@gmail.com": "00000",
+    "ll@gmail.com": "00000"
   },
   "activeSessions": {
-    "limon258144@gmail.com": 1783423512085,
-    "000@gmail.com": 1783423353858
+    "limon258144@gmail.com": 1791061329143,
+    "000@gmail.com": 1783423353858,
+    "00l@gmail.com": 1783636158154,
+    "ll@gmail.com": 1783636418030
   },
-  "proUsers": [],
-  "submittedPayments": [],
+  "proUsers": [
+    {
+      "username": "00l@gmail.com",
+      "expiresAt": 1786228131609,
+      "verifiedAt": 1783636131609
+    },
+    {
+      "username": "ll@gmail.com",
+      "expiresAt": 1786228581135,
+      "verifiedAt": 1783636581135
+    }
+  ],
+  "submittedPayments": [
+    {
+      "id": "pay_1783636083868_413",
+      "username": "00l@gmail.com",
+      "paymentMethod": "bKash",
+      "network": "bKash (বিকাশ)",
+      "amount": 20,
+      "transactionId": "0000000000",
+      "senderNumber": "01568760651",
+      "timestamp": 1783636083868,
+      "status": "approved"
+    },
+    {
+      "id": "pay_1783636440231_768",
+      "username": "ll@gmail.com",
+      "paymentMethod": "bKash",
+      "network": "bKash (বিকাশ)",
+      "amount": 20,
+      "transactionId": "9999999999",
+      "senderNumber": "000000000000",
+      "timestamp": 1783636440231,
+      "status": "approved"
+    }
+  ],
   "supportChats": {
     "limon258144@gmail.com": {
       "messages": [
@@ -24,26 +62,129 @@
           "sender": "user",
           "text": "hi",
           "timestamp": 1783361142022
+        },
+        {
+          "id": "msg_1791060671171_973",
+          "sender": "admin",
+          "text": "Ji",
+          "timestamp": 1791060671171
+        }
+      ],
+      "unreadCountByUser": 1,
+      "unreadCountByAdmin": 0,
+      "lastUpdated": 1791060671171
+    },
+    "00l@gmail.com": {
+      "messages": [
+        {
+          "id": "welcome_msg",
+          "sender": "admin",
+          "text": "আসসালামু আলাইকুম! নীলা ট্রেডার সাপোর্ট হাবে আপনাকে স্বাগতম। আপনার পেমেন্ট বা যেকোনো জিজ্ঞাসা এখানে মেসেজে লিখুন, আমাদের এডমিন টিম দ্রুত আপনাকে রিপ্লাই করবে।",
+          "timestamp": 1783635884608
         }
       ],
       "unreadCountByUser": 0,
-      "unreadCountByAdmin": 1,
-      "lastUpdated": 1783361142022
+      "unreadCountByAdmin": 0,
+      "lastUpdated": 1783635944609
     }
   },
   "analysisLimits": {},
   "configs": {
-    "nila_custom_telegram_v1": "https://t.me/jayedbhai_12",
+    "nila_custom_telegram_v1": "https://t.me/TIN_KOMASTER",
     "nila_custom_owner1_v1": "nila\\ldp.onar",
     "nila_custom_owner2_v1": "korim debolopar",
     "nila_custom_winrate_v1": "98%",
     "nila_custom_announcement_v1": "যেকোনো প্রয়োজনে নিচে দেওয়া টেলিগ্রাম লিংকে মেসেজ করুন",
     "nila_custom_usdt_v1": "TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x",
     "nila_custom_trx_v1": "TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x",
-    "nila_custom_ltc_v1": "01568760651",
+    "nila_custom_ltc_v1": "01767093032",
     "nila_custom_bkash_inst_v1": "* এই বিকাশ পার্সোনাল নাম্বারে সমপরিমাণ টাকা Send Money করুন।",
     "nila_custom_crypto_inst_v1": "* Send exactly the payment amount to this receiver wallet."
   },
   "deletedPayments": [],
-  "deletedUsers": []
+  "deletedUsers": [],
+  "registrationTimes": {
+    "000@gmail.com": 1783423021169,
+    "00l@gmail.com": 1783635623834,
+    "ll@gmail.com": 1783636416528
+  },
+  "disabledUsers": [],
+  "activityLogs": [],
+  "userAccounts": {
+    "limon258144@gmail.com": {
+      "uid": "UID-FB-07F5D15C",
+      "email": "limon258144@gmail.com",
+      "name": "Limon Ahmed",
+      "role": "SUPER_ADMIN",
+      "status": "active",
+      "proStatus": "inactive",
+      "createdAt": 1790456451877,
+      "lastLogin": 1791061329143,
+      "notes": ""
+    },
+    "admin": {
+      "uid": "UID-FB-0586034F",
+      "email": "admin",
+      "name": "Admin",
+      "role": "ADMIN",
+      "status": "active",
+      "proStatus": "inactive",
+      "createdAt": 1790456451877,
+      "lastLogin": 1790456451877,
+      "notes": ""
+    },
+    "000@gmail.com": {
+      "uid": "UID-FB-320793DF",
+      "email": "000@gmail.com",
+      "name": "000",
+      "role": "USER",
+      "status": "active",
+      "proStatus": "inactive",
+      "createdAt": 1783423021169,
+      "lastLogin": 1783423353858,
+      "notes": ""
+    },
+    "00l@gmail.com": {
+      "uid": "UID-FB-4C6DAEA3",
+      "email": "00l@gmail.com",
+      "name": "00l",
+      "role": "USER",
+      "status": "active",
+      "proStatus": "inactive",
+      "proExpiresAt": 1786228131609,
+      "createdAt": 1783635623834,
+      "lastLogin": 1783636158154,
+      "notes": ""
+    },
+    "ll@gmail.com": {
+      "uid": "UID-FB-375C248F",
+      "email": "ll@gmail.com",
+      "name": "Ll",
+      "role": "USER",
+      "status": "active",
+      "proStatus": "inactive",
+      "proExpiresAt": 1786228581135,
+      "createdAt": 1783636416528,
+      "lastLogin": 1783636418030,
+      "notes": ""
+    }
+  },
+  "adminRoles": {
+    "limon258144@gmail.com": {
+      "email": "limon258144@gmail.com",
+      "name": "Limon Ahmed (Super Admin)",
+      "role": "SUPER_ADMIN",
+      "status": "active",
+      "createdAt": 1783360000000,
+      "lastLogin": 1791061251877
+    },
+    "admin@gmail.com": {
+      "email": "admin@gmail.com",
+      "name": "Master Admin",
+      "role": "ADMIN",
+      "status": "active",
+      "createdAt": 1783360000000,
+      "lastLogin": 1791061251877
+    }
+  }
 }

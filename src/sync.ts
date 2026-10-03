@@ -11,7 +11,15 @@ const CONFIG_KEYS = [
   "nila_custom_crypto_inst_v1",
 ];
 
+let isSyncing = false;
+
 export async function syncWithServer() {
+  if (isSyncing) return;
+  isSyncing = true;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
   try {
     const registeredUsers = JSON.parse(localStorage.getItem("nila_registered_users_v2") || "{}");
     const submittedPayments = JSON.parse(localStorage.getItem("nila_submitted_payments_v1") || "[]");
@@ -21,7 +29,11 @@ export async function syncWithServer() {
     const proUsers = JSON.parse(localStorage.getItem("nila_pro_users_v1") || "[]");
     const deletedPayments = JSON.parse(localStorage.getItem("nila_deleted_payments_v1") || "[]");
     const deletedUsers = JSON.parse(localStorage.getItem("nila_deleted_users_v1") || "[]");
+    const disabledUsers = JSON.parse(localStorage.getItem("nila_disabled_users_v1") || "[]");
     const registrationTimes = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
+    const userAccounts = JSON.parse(localStorage.getItem("nila_user_accounts_v1") || "{}");
+    const adminRoles = JSON.parse(localStorage.getItem("nila_admin_roles_v1") || "{}");
+    const activityLogs = JSON.parse(localStorage.getItem("nila_activity_logs_v1") || "[]");
 
     const configs: Record<string, string> = {};
     for (const key of CONFIG_KEYS) {
@@ -34,6 +46,7 @@ export async function syncWithServer() {
     const response = await fetch("/api/db/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
       body: JSON.stringify({
         registeredUsers,
         submittedPayments,
@@ -44,12 +57,18 @@ export async function syncWithServer() {
         configs,
         deletedPayments,
         deletedUsers,
+        disabledUsers,
         registrationTimes,
+        userAccounts,
+        adminRoles,
+        activityLogs,
       }),
     });
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      throw new Error(`Sync API failed: ${response.status}`);
+      return;
     }
 
     const data = await response.json();
@@ -162,6 +181,19 @@ export async function syncWithServer() {
     localStorage.setItem("nila_pro_users_v1", JSON.stringify(filteredProUsers));
     localStorage.setItem("nila_registration_times_v1", JSON.stringify(filteredRegistrationTimes));
 
+    if (state.disabledUsers) {
+      localStorage.setItem("nila_disabled_users_v1", JSON.stringify(state.disabledUsers));
+    }
+    if (state.userAccounts) {
+      localStorage.setItem("nila_user_accounts_v1", JSON.stringify(state.userAccounts));
+    }
+    if (state.adminRoles) {
+      localStorage.setItem("nila_admin_roles_v1", JSON.stringify(state.adminRoles));
+    }
+    if (state.activityLogs) {
+      localStorage.setItem("nila_activity_logs_v1", JSON.stringify(state.activityLogs));
+    }
+
     if (state.configs) {
       for (const [key, val] of Object.entries(state.configs)) {
         localStorage.setItem(key, val as string);
@@ -170,6 +202,52 @@ export async function syncWithServer() {
 
     window.dispatchEvent(new Event("nila_settings_updated"));
   } catch (error) {
-    console.error("[Sync with Server Error]:", error);
+    // Graceful offline/network fallback without throwing noisy console errors
+  } finally {
+    isSyncing = false;
   }
 }
+
+export async function executeAdminAction(
+  adminEmail: string,
+  action: string,
+  targetUser: string,
+  data?: any
+): Promise<{ success: boolean; state?: any; error?: string }> {
+  try {
+    const res = await fetch("/api/admin/action", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        adminEmail,
+        action,
+        targetUser,
+        data,
+      }),
+    });
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      return { success: false, error: errData.error || "Failed to execute action" };
+    }
+
+    const json = await res.json();
+    if (json && json.state) {
+      const state = json.state;
+      if (state.submittedPayments) localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(state.submittedPayments));
+      if (state.proUsers) localStorage.setItem("nila_pro_users_v1", JSON.stringify(state.proUsers));
+      if (state.disabledUsers) localStorage.setItem("nila_disabled_users_v1", JSON.stringify(state.disabledUsers));
+      if (state.userAccounts) localStorage.setItem("nila_user_accounts_v1", JSON.stringify(state.userAccounts));
+      if (state.adminRoles) localStorage.setItem("nila_admin_roles_v1", JSON.stringify(state.adminRoles));
+      if (state.activityLogs) localStorage.setItem("nila_activity_logs_v1", JSON.stringify(state.activityLogs));
+      if (state.activeSessions) localStorage.setItem("nila_active_sessions_v1", JSON.stringify(state.activeSessions));
+      window.dispatchEvent(new Event("nila_settings_updated"));
+      return { success: true, state };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error("executeAdminAction error:", err);
+    return { success: false, error: err.message };
+  }
+}
+

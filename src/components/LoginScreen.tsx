@@ -102,10 +102,33 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
 
   const accounts = getDynamicAccounts();
 
+  const checkIsAccountDisabled = (email: string): boolean => {
+    try {
+      const disabledList = JSON.parse(localStorage.getItem("nila_disabled_users_v1") || "[]");
+      if (disabledList.some((u: string) => u.toLowerCase() === email.toLowerCase())) {
+        return true;
+      }
+      const accounts = JSON.parse(localStorage.getItem("nila_user_accounts_v1") || "{}");
+      if (accounts[email.toLowerCase()]?.status === "disabled") {
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  };
+
   const handleAccountSelect = (email: string) => {
+    setErrorMsg(null);
+    if (checkIsAccountDisabled(email)) {
+      setErrorMsg(
+        language === "bn"
+          ? "আপনার অ্যাকাউন্টটি স্থগিত (Disabled) করা হয়েছে। দয়া করে অ্যাডমিনের সাথে যোগাযোগ করুন।"
+          : "Your account has been disabled. Please contact admin."
+      );
+      return;
+    }
+
     setIsSigningIn(true);
     setSelectedEmail(email);
-    setErrorMsg(null);
     
     // Simulate natural secure Google callback delay
     setTimeout(() => {
@@ -135,6 +158,15 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
         language === "bn"
           ? "সঠিক Gmail দিন, যেমন: username@gmail.com"
           : "Must be a valid @gmail.com address."
+      );
+      return;
+    }
+
+    if (checkIsAccountDisabled(cleanMail)) {
+      setErrorMsg(
+        language === "bn"
+          ? "আপনার অ্যাকাউন্টটি স্থগিত (Disabled) করা হয়েছে। দয়া করে অ্যাডমিনের সাথে যোগাযোগ করুন।"
+          : "Your account has been disabled. Please contact admin."
       );
       return;
     }
@@ -221,6 +253,15 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
         language === "bn" 
           ? "দুঃখিত! এই ইমেইলে কোনো অ্যাকাউন্ট নিবন্ধিত নেই। প্রথমে 'রেজিস্ট্রেশন' করুন।" 
           : "Incorrect email! No registration found. Please Register first."
+      );
+      return;
+    }
+
+    if (checkIsAccountDisabled(email)) {
+      setErrorMsg(
+        language === "bn"
+          ? "আপনার অ্যাকাউন্টটি স্থগিত (Disabled) করা হয়েছে। দয়া করে অ্যাডমিনের সাথে যোগাযোগ করুন।"
+          : "Your account has been disabled. Please contact admin."
       );
       return;
     }

@@ -244,10 +244,23 @@ export default function App() {
         const currentPaymentsStr = localStorage.getItem("nila_submitted_payments_v1") || "[]";
         const payments = JSON.parse(currentPaymentsStr);
         const isBkash = selectedNetwork === "bKash (বিকাশ)";
+        
+        let hash = 0;
+        for (let i = 0; i < targetUsername.length; i++) {
+          hash = (hash << 5) - hash + targetUsername.charCodeAt(i);
+          hash |= 0;
+        }
+        const userUid = `UID-FB-${Math.abs(hash).toString(16).toUpperCase().padStart(8, "0")}`;
+        const baseName = targetUsername.includes("@") ? targetUsername.split("@")[0] : targetUsername;
+        const userName = baseName.charAt(0).toUpperCase() + baseName.slice(1);
+
         const payItem = {
           id: "pay_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
+          userId: userUid,
           username: targetUsername,
-          paymentMethod: isBkash ? "bKash" : "crypto",
+          userEmail: targetUsername,
+          userName: userName,
+          paymentMethod: isBkash ? "bKash" : (selectedNetwork.includes("USDT") ? "USDT" : (selectedNetwork.includes("TRX") ? "TRX" : "Crypto")),
           network: selectedNetwork,
           amount: numericAmount,
           transactionId: cleanTx,
@@ -327,9 +340,24 @@ export default function App() {
     }
   };
 
+  // Helper to check if user account is disabled / blocked
+  const isUserDisabled = (username: string | null): boolean => {
+    if (!username) return false;
+    const lower = username.toLowerCase();
+    try {
+      const disabledUsers: string[] = JSON.parse(localStorage.getItem("nila_disabled_users_v1") || "[]");
+      if (disabledUsers.some(u => u.toLowerCase() === lower)) return true;
+      const userAccounts = JSON.parse(localStorage.getItem("nila_user_accounts_v1") || "{}");
+      if (userAccounts[lower]?.status === "disabled") return true;
+    } catch (e) {}
+    return false;
+  };
+
   // Premium / PRO user checking helper
   const checkUserProStatus = (username: string | null): boolean => {
     if (!username) return false;
+    // Disabled users are never PRO
+    if (isUserDisabled(username)) return false;
     if (isUserAdmin(username)) return true;
     try {
       const proUsersStr = localStorage.getItem("nila_pro_users_v1") || "[]";
@@ -372,7 +400,7 @@ export default function App() {
       const entry = proUsers.find((e: any) => {
         if (typeof e === "string") {
           return e.toLowerCase() === username.toLowerCase();
-        } else if (e && typeof e === "object" && e.username) {
+        } else if (e && typeof e === "object" && entry.username) {
           return e.username.toLowerCase() === username.toLowerCase();
         }
         return false;
@@ -396,10 +424,15 @@ export default function App() {
   const isUserAdmin = (username: string | null): boolean => {
     if (!username) return false;
     const lower = username.toLowerCase();
+    try {
+      const adminRoles = JSON.parse(localStorage.getItem("nila_admin_roles_v1") || "{}");
+      if (adminRoles[lower] && adminRoles[lower].status === "active") return true;
+    } catch (e) {}
     return (
       lower === "00000000000" || 
       lower === "limon258144@gmail.com" || 
-      lower === "admin@gmail.com"
+      lower === "admin@gmail.com" ||
+      lower === "admin"
     );
   };
 
@@ -1253,9 +1286,62 @@ export default function App() {
                 }
               }} 
             />
+          ) : isUserDisabled(currentUser) ? (
+            <div className="flex flex-col items-center justify-center p-6 text-center space-y-4 my-auto min-h-[460px] animate-fade-in">
+              <div className="w-16 h-16 rounded-full bg-rose-500/10 border-2 border-rose-500/30 flex items-center justify-center text-rose-400">
+                <AlertCircle className="w-8 h-8 animate-bounce" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-white font-black text-lg uppercase tracking-tight">
+                  {language === "bn" ? "অ্যাকাউন্ট স্থগিত করা হয়েছে" : "Account Suspended / Disabled"}
+                </h3>
+                <p className="text-rose-400 font-bold text-sm">
+                  {language === "bn"
+                    ? "আপনার অ্যাকাউন্টটি স্থগিত (Disabled) করা হয়েছে। দয়া করে অ্যাডমিনের সাথে যোগাযোগ করুন।"
+                    : "Your account has been disabled. Please contact admin."}
+                </p>
+                <p className="text-slate-400 text-xs leading-relaxed max-w-xs mx-auto">
+                  {language === "bn"
+                    ? "আপনার কোনো জিজ্ঞাসা বা ভুল বোঝাবুঝি থাকলে সরাসরি অ্যাডমিনকে টেলিগ্রামে মেসেজ দিন।"
+                    : "If you have any questions or require assistance, please contact the administrator."}
+                </p>
+              </div>
+              <div className="flex flex-col gap-2.5 w-full max-w-xs pt-4">
+                <button
+                  type="button"
+                  onClick={() => window.open(telegramLink, "_blank")}
+                  className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition active:scale-95 cursor-pointer"
+                >
+                  <Send className="w-4 h-4" />
+                  {language === "bn" ? "টেলিগ্রামে যোগাযোগ করুন" : "Contact Admin via Telegram"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const u = currentUser;
+                    setCurrentUser(null);
+                    localStorage.removeItem("nila_logged_in_user_v1");
+                    setShowAdminPanel(false);
+                    try {
+                      const storedSessions = localStorage.getItem("nila_active_sessions_v1");
+                      if (storedSessions && u) {
+                        const sessions = JSON.parse(storedSessions);
+                        delete sessions[u];
+                        localStorage.setItem("nila_active_sessions_v1", JSON.stringify(sessions));
+                        window.dispatchEvent(new Event("nila_settings_updated"));
+                      }
+                    } catch (err) {}
+                  }}
+                  className="w-full py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-xs transition active:scale-95 cursor-pointer"
+                >
+                  {language === "bn" ? "লগ আউট করুন (Log Out)" : "Log Out"}
+                </button>
+              </div>
+            </div>
           ) : showAdminPanel ? (
             <AdminPanel 
               language={language} 
+              currentUser={currentUser}
               onBackToApp={() => setShowAdminPanel(false)} 
             />
           ) : (

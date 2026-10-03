@@ -19,20 +19,148 @@ interface DbState {
   proUsers: Array<{ username: string; expiresAt: number; verifiedAt: number }>;
   submittedPayments: Array<{
     id: string;
+    userId?: string;
     username: string;
-    senderNumber: string;
+    userEmail?: string;
+    userName?: string;
+    paymentMethod?: string;
+    senderNumber?: string;
     transactionId: string;
     amount: number;
-    network: string;
-    status: "pending" | "approved" | "rejected";
+    network?: string;
+    status: "pending" | "approved" | "rejected" | "disabled";
     timestamp: number;
+    approvedAt?: number;
+    approvedBy?: string;
+    disabledAt?: number;
+    disabledBy?: string;
   }>;
   supportChats: Record<string, any>;
   analysisLimits: Record<string, any>;
   configs: Record<string, string>;
   deletedPayments?: string[];
   deletedUsers?: string[];
+  disabledUsers?: string[];
   registrationTimes?: Record<string, number>;
+  userAccounts?: Record<string, {
+    uid: string;
+    email: string;
+    name: string;
+    role: "SUPER_ADMIN" | "ADMIN" | "USER";
+    status: "active" | "inactive" | "disabled";
+    proStatus: "active" | "inactive";
+    proExpiresAt?: number;
+    createdAt: number;
+    lastLogin: number;
+    notes?: string;
+  }>;
+  adminRoles?: Record<string, {
+    email: string;
+    name: string;
+    role: "SUPER_ADMIN" | "ADMIN";
+    status: "active" | "disabled";
+    createdAt: number;
+    lastLogin: number;
+  }>;
+  activityLogs?: Array<{
+    id: string;
+    adminEmail: string;
+    adminUid: string;
+    action: string;
+    targetUser: string;
+    timestamp: number;
+    details?: string;
+  }>;
+}
+
+// Generate consistent deterministic UID for each user email
+function generateUid(email: string): string {
+  let hash = 0;
+  for (let i = 0; i < email.length; i++) {
+    hash = (hash << 5) - hash + email.charCodeAt(i);
+    hash |= 0;
+  }
+  const hex = Math.abs(hash).toString(16).toUpperCase().padStart(8, "0");
+  return `UID-FB-${hex}`;
+}
+
+function ensureUserAccounts(db: DbState) {
+  if (!db.userAccounts) db.userAccounts = {};
+  if (!db.disabledUsers) db.disabledUsers = [];
+  if (!db.activityLogs) db.activityLogs = [];
+  if (!db.adminRoles) {
+    db.adminRoles = {
+      "limon258144@gmail.com": {
+        email: "limon258144@gmail.com",
+        name: "Limon Ahmed (Super Admin)",
+        role: "SUPER_ADMIN",
+        status: "active",
+        createdAt: 1783360000000,
+        lastLogin: Date.now(),
+      },
+      "admin@gmail.com": {
+        email: "admin@gmail.com",
+        name: "Master Admin",
+        role: "ADMIN",
+        status: "active",
+        createdAt: 1783360000000,
+        lastLogin: Date.now(),
+      }
+    };
+  } else {
+    // If "admin" exists alongside "admin@gmail.com", clean up duplicate
+    if (db.adminRoles["admin"] && db.adminRoles["admin@gmail.com"]) {
+      delete db.adminRoles["admin"];
+    }
+  }
+
+  const allEmails = new Set<string>([
+    ...Object.keys(db.registeredUsers || {}),
+    ...Object.keys(db.registrationTimes || {}),
+    ...Object.keys(db.activeSessions || {}),
+    ...(db.proUsers || []).map(p => p.username),
+    ...(db.submittedPayments || []).map(p => p.username),
+  ]);
+
+  for (const rawEmail of allEmails) {
+    if (!rawEmail) continue;
+    const email = rawEmail.toLowerCase();
+    const existing = db.userAccounts[email];
+    const uid = existing?.uid || generateUid(email);
+    
+    // Check if admin
+    const isAdmin = email === "limon258144@gmail.com" || email === "admin" || email === "admin@gmail.com" || !!db.adminRoles[email];
+    const role = email === "limon258144@gmail.com" ? "SUPER_ADMIN" : (isAdmin ? "ADMIN" : (existing?.role || "USER"));
+
+    // Check status
+    const isDisabled = db.disabledUsers.includes(email);
+    const status = isDisabled ? "disabled" : (existing?.status || "active");
+
+    // Check pro status
+    const proEntry = (db.proUsers || []).find(p => p && p.username && p.username.toLowerCase() === email);
+    const isPro = !!proEntry && (!proEntry.expiresAt || proEntry.expiresAt > Date.now()) && !isDisabled;
+    const proStatus = isPro ? "active" : "inactive";
+    const proExpiresAt = proEntry?.expiresAt;
+
+    const createdAt = db.registrationTimes?.[email] || existing?.createdAt || (Date.now() - 7 * 86400000);
+    const lastLogin = db.activeSessions?.[email] || existing?.lastLogin || createdAt;
+
+    const baseName = email.includes("@") ? email.split("@")[0] : email;
+    const name = existing?.name || (email === "limon258144@gmail.com" ? "Limon Ahmed" : (baseName.charAt(0).toUpperCase() + baseName.slice(1)));
+
+    db.userAccounts[email] = {
+      uid,
+      email,
+      name,
+      role,
+      status,
+      proStatus,
+      proExpiresAt,
+      createdAt,
+      lastLogin,
+      notes: existing?.notes || "",
+    };
+  }
 }
 
 function readDb(): DbState {
@@ -43,20 +171,27 @@ function readDb(): DbState {
       if (db) {
         if (!db.deletedPayments) db.deletedPayments = [];
         if (!db.deletedUsers) db.deletedUsers = [];
+        if (!db.disabledUsers) db.disabledUsers = [];
         if (!db.registrationTimes) db.registrationTimes = {};
+        if (!db.activityLogs) db.activityLogs = [];
         if (Array.isArray(db.submittedPayments)) {
           db.submittedPayments = db.submittedPayments.filter((p: any) => {
             return p && p.id && p.id.length >= 8;
           });
         }
+        ensureUserAccounts(db);
       }
       return db;
     }
   } catch (err) {
     console.error("Error reading db_state.json:", err);
   }
-  return {
-    registeredUsers: {},
+  const defaultDb: DbState = {
+    registeredUsers: {
+      "limon258144@gmail.com": "limon000",
+      "admin@gmail.com": "admin123",
+      "admin": "admin123"
+    },
     activeSessions: {},
     proUsers: [],
     submittedPayments: [],
@@ -65,12 +200,19 @@ function readDb(): DbState {
     configs: {},
     deletedPayments: [],
     deletedUsers: [],
+    disabledUsers: [],
     registrationTimes: {},
+    userAccounts: {},
+    adminRoles: {},
+    activityLogs: [],
   };
+  ensureUserAccounts(defaultDb);
+  return defaultDb;
 }
 
 function writeDb(state: DbState) {
   try {
+    ensureUserAccounts(state);
     fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2), "utf-8");
   } catch (err) {
     console.error("Error writing db_state.json:", err);
@@ -256,10 +398,328 @@ app.post("/api/db/sync", (req, res) => {
       db.registrationTimes = { ...db.registrationTimes, ...payload.registrationTimes };
     }
 
+    // 9. Merge disabledUsers
+    if (payload.disabledUsers && Array.isArray(payload.disabledUsers)) {
+      const mergedDisabled = Array.from(new Set([...(db.disabledUsers || []), ...payload.disabledUsers]));
+      db.disabledUsers = mergedDisabled;
+    }
+
+    // 10. Merge adminRoles
+    if (payload.adminRoles && typeof payload.adminRoles === "object") {
+      db.adminRoles = { ...(db.adminRoles || {}), ...payload.adminRoles };
+    }
+
+    // 11. Merge activityLogs
+    if (payload.activityLogs && Array.isArray(payload.activityLogs)) {
+      const logMap = new Map<string, any>();
+      for (const log of db.activityLogs || []) {
+        if (log && log.id) logMap.set(log.id, log);
+      }
+      for (const log of payload.activityLogs) {
+        if (log && log.id) logMap.set(log.id, log);
+      }
+      db.activityLogs = Array.from(logMap.values())
+        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+        .slice(0, 100); // keep last 100 audit logs
+    }
+
+    // 12. Merge userAccounts
+    if (payload.userAccounts && typeof payload.userAccounts === "object") {
+      db.userAccounts = { ...(db.userAccounts || {}), ...payload.userAccounts };
+    }
+
+    ensureUserAccounts(db);
     writeDb(db);
-    res.json({ status: "ok", state: db });
+
+    // Sanitize state before sending to client: Never expose plaintext passwords
+    const safeRegisteredUsers: Record<string, string> = {};
+    for (const [key] of Object.entries(db.registeredUsers || {})) {
+      safeRegisteredUsers[key] = "PROTECTED";
+    }
+
+    const safeState = {
+      ...db,
+      registeredUsers: safeRegisteredUsers,
+    };
+
+    res.json({ status: "ok", state: safeState });
   } catch (err: any) {
     console.error("[Sync API Error]:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Dedicated Super Admin Action Endpoint
+app.post("/api/admin/action", (req, res): any => {
+  try {
+    const { adminEmail, action, targetUser, data } = req.body || {};
+    if (!adminEmail || !action) {
+      return res.status(400).json({ error: "adminEmail and action are required" });
+    }
+
+    const db = readDb();
+    ensureUserAccounts(db);
+
+    const callerAccount = db.userAccounts?.[adminEmail.toLowerCase()] || db.adminRoles?.[adminEmail.toLowerCase()];
+    const isSuper = adminEmail.toLowerCase() === "limon258144@gmail.com" || callerAccount?.role === "SUPER_ADMIN";
+    const isAdmin = isSuper || adminEmail.toLowerCase() === "admin" || adminEmail.toLowerCase() === "admin@gmail.com" || callerAccount?.role === "ADMIN";
+
+    if (!isAdmin) {
+      return res.status(403).json({ error: "Unauthorized. Admin privileges required." });
+    }
+
+    const adminUid = (callerAccount && "uid" in callerAccount && callerAccount.uid) ? callerAccount.uid : generateUid(adminEmail);
+    const target = targetUser ? targetUser.toLowerCase() : "";
+    let logDescription = "";
+
+    switch (action) {
+      case "APPROVE_PAYMENT": {
+        const paymentId = data?.paymentId;
+        if (paymentId) {
+          db.submittedPayments = (db.submittedPayments || []).map(p => {
+            if (p.id === paymentId) {
+              return {
+                ...p,
+                status: "approved",
+                approvedAt: Date.now(),
+                approvedBy: adminEmail,
+              };
+            }
+            return p;
+          });
+        }
+        if (target) {
+          // Grant 30 days PRO
+          const expiresAt = Date.now() + 30 * 24 * 3600 * 1000;
+          const proUsers = (db.proUsers || []).filter(p => p.username.toLowerCase() !== target);
+          proUsers.push({
+            username: target,
+            expiresAt,
+            verifiedAt: Date.now(),
+          });
+          db.proUsers = proUsers;
+
+          // Remove from disabledUsers if was disabled
+          db.disabledUsers = (db.disabledUsers || []).filter(u => u !== target);
+
+          if (db.userAccounts?.[target]) {
+            db.userAccounts[target].status = "active";
+            db.userAccounts[target].proStatus = "active";
+            db.userAccounts[target].proExpiresAt = expiresAt;
+          }
+          logDescription = `Approved payment request (${paymentId || "N/A"}) and activated PRO for 30 days`;
+        }
+        break;
+      }
+
+      case "DISABLE_PAYMENT": {
+        const paymentId = data?.paymentId;
+        if (paymentId) {
+          db.submittedPayments = (db.submittedPayments || []).map(p => {
+            if (p.id === paymentId) {
+              return {
+                ...p,
+                status: "disabled",
+                disabledAt: Date.now(),
+                disabledBy: adminEmail,
+              };
+            }
+            return p;
+          });
+        }
+        if (target) {
+          // Disable user account and revoke Pro
+          if (!db.disabledUsers.includes(target)) {
+            db.disabledUsers.push(target);
+          }
+          db.proUsers = (db.proUsers || []).filter(p => p.username.toLowerCase() !== target);
+          if (db.userAccounts?.[target]) {
+            db.userAccounts[target].status = "disabled";
+            db.userAccounts[target].proStatus = "inactive";
+          }
+          delete db.activeSessions[target];
+          logDescription = `Disabled payment request (${paymentId || "N/A"}) and banned user account`;
+        }
+        break;
+      }
+
+      case "ACTIVATE_USER": {
+        if (target) {
+          db.disabledUsers = (db.disabledUsers || []).filter(u => u !== target);
+          if (db.userAccounts?.[target]) {
+            db.userAccounts[target].status = "active";
+          }
+          logDescription = `Activated user account`;
+        }
+        break;
+      }
+
+      case "DEACTIVATE_USER": {
+        if (target) {
+          if (db.userAccounts?.[target]) {
+            db.userAccounts[target].status = "inactive";
+          }
+          delete db.activeSessions[target];
+          logDescription = `Set user account to inactive`;
+        }
+        break;
+      }
+
+      case "DISABLE_USER": {
+        if (target) {
+          if (!db.disabledUsers.includes(target)) {
+            db.disabledUsers.push(target);
+          }
+          db.proUsers = (db.proUsers || []).filter(p => p.username.toLowerCase() !== target);
+          if (db.userAccounts?.[target]) {
+            db.userAccounts[target].status = "disabled";
+            db.userAccounts[target].proStatus = "inactive";
+          }
+          delete db.activeSessions[target];
+          logDescription = `Disabled user account`;
+        }
+        break;
+      }
+
+      case "ACTIVATE_PRO": {
+        if (target) {
+          const days = Number(data?.days) || 30;
+          const expiresAt = Date.now() + days * 24 * 3600 * 1000;
+          const proUsers = (db.proUsers || []).filter(p => p.username.toLowerCase() !== target);
+          proUsers.push({
+            username: target,
+            expiresAt,
+            verifiedAt: Date.now(),
+          });
+          db.proUsers = proUsers;
+          db.disabledUsers = (db.disabledUsers || []).filter(u => u !== target);
+          if (db.userAccounts?.[target]) {
+            db.userAccounts[target].status = "active";
+            db.userAccounts[target].proStatus = "active";
+            db.userAccounts[target].proExpiresAt = expiresAt;
+          }
+          logDescription = `Manually activated PRO for ${days} days`;
+        }
+        break;
+      }
+
+      case "DEACTIVATE_PRO": {
+        if (target) {
+          db.proUsers = (db.proUsers || []).filter(p => p.username.toLowerCase() !== target);
+          if (db.userAccounts?.[target]) {
+            db.userAccounts[target].proStatus = "inactive";
+            delete db.userAccounts[target].proExpiresAt;
+          }
+          logDescription = `Deactivated PRO membership`;
+        }
+        break;
+      }
+
+      case "RESET_PASSWORD": {
+        const newPassword = data?.newPassword;
+        if (target && newPassword) {
+          db.registeredUsers[target] = newPassword;
+          logDescription = `Reset password for user`;
+        }
+        break;
+      }
+
+      case "ADD_ADMIN": {
+        if (!isSuper) {
+          return res.status(403).json({ error: "Only Super Admin can manage administrators" });
+        }
+        const newAdminEmail = data?.email?.toLowerCase();
+        const newAdminName = data?.name || newAdminEmail?.split("@")[0];
+        const newRole = data?.role === "SUPER_ADMIN" ? "SUPER_ADMIN" : "ADMIN";
+        if (newAdminEmail) {
+          if (!db.adminRoles) db.adminRoles = {};
+          db.adminRoles[newAdminEmail] = {
+            email: newAdminEmail,
+            name: newAdminName,
+            role: newRole,
+            status: "active",
+            createdAt: Date.now(),
+            lastLogin: Date.now(),
+          };
+          if (!db.registeredUsers[newAdminEmail]) {
+            db.registeredUsers[newAdminEmail] = data?.password || "admin123";
+          }
+          if (db.userAccounts?.[newAdminEmail]) {
+            db.userAccounts[newAdminEmail].role = newRole;
+          }
+          logDescription = `Added ${newRole}: ${newAdminEmail} (${newAdminName})`;
+        }
+        break;
+      }
+
+      case "DISABLE_ADMIN": {
+        if (!isSuper) {
+          return res.status(403).json({ error: "Only Super Admin can manage administrators" });
+        }
+        const adminToDisable = target;
+        if (adminToDisable === "limon258144@gmail.com") {
+          return res.status(400).json({ error: "Cannot disable primary Super Admin" });
+        }
+        if (db.adminRoles?.[adminToDisable]) {
+          db.adminRoles[adminToDisable].status = "disabled";
+        }
+        logDescription = `Disabled administrator account: ${adminToDisable}`;
+        break;
+      }
+
+      case "REMOVE_ADMIN": {
+        if (!isSuper) {
+          return res.status(403).json({ error: "Only Super Admin can manage administrators" });
+        }
+        const adminToRemove = target;
+        if (adminToRemove === "limon258144@gmail.com") {
+          return res.status(400).json({ error: "Cannot remove primary Super Admin" });
+        }
+        if (db.adminRoles?.[adminToRemove]) {
+          delete db.adminRoles[adminToRemove];
+        }
+        if (db.userAccounts?.[adminToRemove]) {
+          db.userAccounts[adminToRemove].role = "USER";
+        }
+        logDescription = `Removed admin role from: ${adminToRemove}`;
+        break;
+      }
+
+      default:
+        return res.status(400).json({ error: `Unknown action: ${action}` });
+    }
+
+    // Append to activity log
+    if (logDescription) {
+      if (!db.activityLogs) db.activityLogs = [];
+      db.activityLogs.unshift({
+        id: `act_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        adminEmail,
+        adminUid,
+        action: logDescription,
+        targetUser: target,
+        timestamp: Date.now(),
+        details: data ? JSON.stringify(data) : undefined,
+      });
+      db.activityLogs = db.activityLogs.slice(0, 100);
+    }
+
+    ensureUserAccounts(db);
+    writeDb(db);
+
+    const safeRegisteredUsers: Record<string, string> = {};
+    for (const [key] of Object.entries(db.registeredUsers || {})) {
+      safeRegisteredUsers[key] = "PROTECTED";
+    }
+
+    const safeState = {
+      ...db,
+      registeredUsers: safeRegisteredUsers,
+    };
+
+    res.json({ status: "ok", state: safeState });
+  } catch (err: any) {
+    console.error("[Admin Action Error]:", err);
     res.status(500).json({ error: err.message });
   }
 });
