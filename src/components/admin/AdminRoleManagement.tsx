@@ -73,7 +73,7 @@ export default function AdminRoleManagement({
       {/* Admin Cards List */}
       <div className="space-y-3">
         {list.map((admin, idx) => {
-          const isPrimary = admin.email.toLowerCase() === "limon258144@gmail.com";
+          const isPrimary = admin.email.toLowerCase() === "limon2581444@gmail.com" || admin.email.toLowerCase() === "limon2581444@gmail";
           const isSelf = currentAdminEmail && currentAdminEmail.toLowerCase() === admin.email.toLowerCase();
 
           return (

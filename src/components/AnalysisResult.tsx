@@ -23,13 +23,17 @@ export default function AnalysisResult({ analysis = {} as TradingAnalysis, langu
   const isDown = analysis?.prediction?.toLowerCase() === "down" && !isConfidenceBelow70;
   const isNotChart = analysis?.prediction?.toLowerCase() === "not_a_chart";
 
-  const [telegram, setTelegram] = React.useState("https://t.me/TIN_KOMASTER");
+  const [telegram, setTelegram] = React.useState("https://t.me/qtx8881");
   const [owner1, setOwner1] = React.useState("nila\\ldp.onar");
   const [owner2, setOwner2] = React.useState("korim debolopar");
 
   React.useEffect(() => {
     const loadCustomVals = () => {
-      const storedTelegram = localStorage.getItem("nila_custom_telegram_v1");
+      let storedTelegram = localStorage.getItem("nila_custom_telegram_v1");
+      if (storedTelegram === "https://t.me/addmineanlice" || storedTelegram === "https://t.me/korimtrader_vip" || storedTelegram === "https://t.me/jayedbhai_12" || storedTelegram === "https://t.me/TIN_KOMASTER" || !storedTelegram) {
+        storedTelegram = "https://t.me/qtx8881";
+        localStorage.setItem("nila_custom_telegram_v1", "https://t.me/qtx8881");
+      }
       if (storedTelegram) setTelegram(storedTelegram);
 
       const storedOwner1 = localStorage.getItem("nila_custom_owner1_v1");

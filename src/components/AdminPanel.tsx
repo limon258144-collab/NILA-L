@@ -47,15 +47,15 @@ export default function AdminPanel({ language, onBackToApp, currentUser }: Admin
   const [adminReplyText, setAdminReplyText] = useState("");
 
   // App settings state
-  const [adminTelegram, setAdminTelegram] = useState("https://t.me/TIN_KOMASTER");
+  const [adminTelegram, setAdminTelegram] = useState("https://t.me/qtx8881");
   const [globalAnnouncement, setGlobalAnnouncement] = useState("যেকোনো প্রয়োজনে নিচে দেওয়া টেলিগ্রাম লিংকে মেসেজ করুন");
   const [adminUsdt, setAdminUsdt] = useState("TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x");
   const [adminTrx, setAdminTrx] = useState("TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x");
   const [adminLtc, setAdminLtc] = useState("01767093032");
   const [adminBkashInst, setAdminBkashInst] = useState("* এই বিকাশ পার্সোনাল নাম্বারে সমপরিমাণ টাকা Send Money করুন।");
 
-  const adminEmail = (currentUser || "limon258144@gmail.com").toLowerCase();
-  const isSuperAdmin = adminEmail === "limon258144@gmail.com" || adminRoles[adminEmail]?.role === "SUPER_ADMIN";
+  const adminEmail = (currentUser || "limon2581444@gmail.com").toLowerCase();
+  const isSuperAdmin = adminEmail === "limon2581444@gmail.com" || adminEmail === "limon2581444@gmail" || adminRoles[adminEmail]?.role === "SUPER_ADMIN";
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -80,7 +80,11 @@ export default function AdminPanel({ language, onBackToApp, currentUser }: Admin
       const chats = JSON.parse(localStorage.getItem("nila_support_chats_v2") || "{}");
       setSupportChats(chats);
 
-      const storedTg = localStorage.getItem("nila_custom_telegram_v1");
+      let storedTg = localStorage.getItem("nila_custom_telegram_v1");
+      if (storedTg === "https://t.me/addmineanlice" || storedTg === "https://t.me/korimtrader_vip" || storedTg === "https://t.me/jayedbhai_12" || storedTg === "https://t.me/TIN_KOMASTER" || !storedTg) {
+        storedTg = "https://t.me/qtx8881";
+        localStorage.setItem("nila_custom_telegram_v1", "https://t.me/qtx8881");
+      }
       if (storedTg) setAdminTelegram(storedTg);
       const storedAnn = localStorage.getItem("nila_custom_announcement_v1");
       if (storedAnn) setGlobalAnnouncement(storedAnn);
@@ -583,9 +587,9 @@ export default function AdminPanel({ language, onBackToApp, currentUser }: Admin
               {Object.keys(supportChats).length === 0 ? (
                 <p className="text-xs text-slate-500 italic p-3 text-center">No active chats.</p>
               ) : (
-                Object.entries(supportChats).map(([user, chat]: [string, any]) => (
+                Object.entries(supportChats).map(([user, chat]: [string, any], idx) => (
                   <button
-                    key={user}
+                    key={`support_chat_${user}_${idx}`}
                     type="button"
                     onClick={() => setSelectedChatUser(user)}
                     className={`w-full text-left p-2.5 rounded-xl border text-xs transition cursor-pointer ${

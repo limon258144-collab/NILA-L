@@ -88,31 +88,38 @@ function ensureUserAccounts(db: DbState) {
   if (!db.userAccounts) db.userAccounts = {};
   if (!db.disabledUsers) db.disabledUsers = [];
   if (!db.activityLogs) db.activityLogs = [];
-  if (!db.adminRoles) {
-    db.adminRoles = {
-      "limon258144@gmail.com": {
-        email: "limon258144@gmail.com",
-        name: "Limon Ahmed (Super Admin)",
-        role: "SUPER_ADMIN",
-        status: "active",
-        createdAt: 1783360000000,
-        lastLogin: Date.now(),
-      },
-      "admin@gmail.com": {
-        email: "admin@gmail.com",
-        name: "Master Admin",
-        role: "ADMIN",
-        status: "active",
-        createdAt: 1783360000000,
-        lastLogin: Date.now(),
-      }
-    };
-  } else {
-    // If "admin" exists alongside "admin@gmail.com", clean up duplicate
-    if (db.adminRoles["admin"] && db.adminRoles["admin@gmail.com"]) {
-      delete db.adminRoles["admin"];
-    }
+  
+  // Clean up legacy admin roles and credentials
+  if (db.adminRoles) {
+    delete db.adminRoles["limon258144@gmail.com"];
+    delete db.adminRoles["admin@gmail.com"];
+    delete db.adminRoles["admin"];
   }
+
+  if (db.registeredUsers) {
+    db.registeredUsers["limon2581444@gmail.com"] = "limonAbc123";
+    delete db.registeredUsers["limon258144@gmail.com"];
+    delete db.registeredUsers["admin"];
+  }
+
+  if (db.userAccounts) {
+    delete db.userAccounts["limon258144@gmail.com"];
+    delete db.userAccounts["admin"];
+  }
+
+  if (!db.adminRoles) {
+    db.adminRoles = {};
+  }
+  
+  // Ensure the single authorized Master Super Admin role
+  db.adminRoles["limon2581444@gmail.com"] = {
+    email: "limon2581444@gmail.com",
+    name: "Limon Ahmed (Super Admin)",
+    role: "SUPER_ADMIN",
+    status: "active",
+    createdAt: 1783360000000,
+    lastLogin: Date.now(),
+  };
 
   const allEmails = new Set<string>([
     ...Object.keys(db.registeredUsers || {}),
@@ -128,9 +135,10 @@ function ensureUserAccounts(db: DbState) {
     const existing = db.userAccounts[email];
     const uid = existing?.uid || generateUid(email);
     
-    // Check if admin
-    const isAdmin = email === "limon258144@gmail.com" || email === "admin" || email === "admin@gmail.com" || !!db.adminRoles[email];
-    const role = email === "limon258144@gmail.com" ? "SUPER_ADMIN" : (isAdmin ? "ADMIN" : (existing?.role || "USER"));
+    // Check if admin - strictly limon2581444@gmail.com (or explicitly assigned in adminRoles)
+    const isSuper = email === "limon2581444@gmail.com" || email === "limon2581444@gmail" || db.adminRoles[email]?.role === "SUPER_ADMIN";
+    const isAdmin = isSuper || db.adminRoles[email]?.role === "ADMIN";
+    const role = isSuper ? "SUPER_ADMIN" : (isAdmin ? "ADMIN" : (existing?.role || "USER"));
 
     // Check status
     const isDisabled = db.disabledUsers.includes(email);
@@ -139,14 +147,14 @@ function ensureUserAccounts(db: DbState) {
     // Check pro status
     const proEntry = (db.proUsers || []).find(p => p && p.username && p.username.toLowerCase() === email);
     const isPro = !!proEntry && (!proEntry.expiresAt || proEntry.expiresAt > Date.now()) && !isDisabled;
-    const proStatus = isPro ? "active" : "inactive";
-    const proExpiresAt = proEntry?.expiresAt;
+    const proStatus = (isSuper || isPro) ? "active" : "inactive";
+    const proExpiresAt = isSuper ? (Date.now() + 365 * 86400000) : proEntry?.expiresAt;
 
     const createdAt = db.registrationTimes?.[email] || existing?.createdAt || (Date.now() - 7 * 86400000);
     const lastLogin = db.activeSessions?.[email] || existing?.lastLogin || createdAt;
 
     const baseName = email.includes("@") ? email.split("@")[0] : email;
-    const name = existing?.name || (email === "limon258144@gmail.com" ? "Limon Ahmed" : (baseName.charAt(0).toUpperCase() + baseName.slice(1)));
+    const name = existing?.name || (isSuper ? "Limon Ahmed (Super Admin)" : (baseName.charAt(0).toUpperCase() + baseName.slice(1)));
 
     db.userAccounts[email] = {
       uid,
@@ -158,7 +166,7 @@ function ensureUserAccounts(db: DbState) {
       proExpiresAt,
       createdAt,
       lastLogin,
-      notes: existing?.notes || "",
+      notes: existing?.notes || (isSuper ? "Master Super Admin" : ""),
     };
   }
 }
@@ -188,9 +196,7 @@ function readDb(): DbState {
   }
   const defaultDb: DbState = {
     registeredUsers: {
-      "limon258144@gmail.com": "limon000",
-      "admin@gmail.com": "admin123",
-      "admin": "admin123"
+      "limon2581444@gmail.com": "limonAbc123"
     },
     activeSessions: {},
     proUsers: [],
@@ -461,8 +467,8 @@ app.post("/api/admin/action", (req, res): any => {
     ensureUserAccounts(db);
 
     const callerAccount = db.userAccounts?.[adminEmail.toLowerCase()] || db.adminRoles?.[adminEmail.toLowerCase()];
-    const isSuper = adminEmail.toLowerCase() === "limon258144@gmail.com" || callerAccount?.role === "SUPER_ADMIN";
-    const isAdmin = isSuper || adminEmail.toLowerCase() === "admin" || adminEmail.toLowerCase() === "admin@gmail.com" || callerAccount?.role === "ADMIN";
+    const isSuper = adminEmail.toLowerCase() === "limon2581444@gmail.com" || adminEmail.toLowerCase() === "limon2581444@gmail" || callerAccount?.role === "SUPER_ADMIN";
+    const isAdmin = isSuper || callerAccount?.role === "ADMIN";
 
     if (!isAdmin) {
       return res.status(403).json({ error: "Unauthorized. Admin privileges required." });
@@ -657,7 +663,7 @@ app.post("/api/admin/action", (req, res): any => {
           return res.status(403).json({ error: "Only Super Admin can manage administrators" });
         }
         const adminToDisable = target;
-        if (adminToDisable === "limon258144@gmail.com") {
+        if (adminToDisable === "limon2581444@gmail.com" || adminToDisable === "limon2581444@gmail") {
           return res.status(400).json({ error: "Cannot disable primary Super Admin" });
         }
         if (db.adminRoles?.[adminToDisable]) {
@@ -672,7 +678,7 @@ app.post("/api/admin/action", (req, res): any => {
           return res.status(403).json({ error: "Only Super Admin can manage administrators" });
         }
         const adminToRemove = target;
-        if (adminToRemove === "limon258144@gmail.com") {
+        if (adminToRemove === "limon2581444@gmail.com" || adminToRemove === "limon2581444@gmail") {
           return res.status(400).json({ error: "Cannot remove primary Super Admin" });
         }
         if (db.adminRoles?.[adminToRemove]) {

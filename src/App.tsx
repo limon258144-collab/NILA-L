@@ -60,7 +60,7 @@ export default function App() {
   const [networkFilter, setNetworkFilter] = useState<"all" | "active">("all");
 
   // App configurations controlled dynamically by the admin
-  const [telegramLink, setTelegramLink] = useState("https://t.me/TIN_KOMASTER");
+  const [telegramLink, setTelegramLink] = useState("https://t.me/qtx8881");
   const [globalAnnouncement, setGlobalAnnouncement] = useState("");
   const [analysisReloadKey, setAnalysisReloadKey] = useState(0);
 
@@ -101,9 +101,9 @@ export default function App() {
   const refreshCustomConfig = () => {
     try {
       let storedTelegram = localStorage.getItem("nila_custom_telegram_v1");
-      if (storedTelegram === "https://t.me/addmineanlice" || storedTelegram === "https://t.me/korimtrader_vip" || storedTelegram === "https://t.me/jayedbhai_12" || !storedTelegram) {
-        storedTelegram = "https://t.me/TIN_KOMASTER";
-        localStorage.setItem("nila_custom_telegram_v1", "https://t.me/TIN_KOMASTER");
+      if (storedTelegram === "https://t.me/addmineanlice" || storedTelegram === "https://t.me/korimtrader_vip" || storedTelegram === "https://t.me/jayedbhai_12" || storedTelegram === "https://t.me/TIN_KOMASTER" || !storedTelegram) {
+        storedTelegram = "https://t.me/qtx8881";
+        localStorage.setItem("nila_custom_telegram_v1", "https://t.me/qtx8881");
       }
       if (storedTelegram) setTelegramLink(storedTelegram);
 
@@ -144,7 +144,7 @@ export default function App() {
         setActiveSessions(JSON.parse(storedActive));
       } else {
         const defaultActive = {
-          "limon258144@gmail.com": Date.now()
+          "limon2581444@gmail.com": Date.now()
         };
         setActiveSessions(defaultActive);
         localStorage.setItem("nila_active_sessions_v1", JSON.stringify(defaultActive));
@@ -423,17 +423,16 @@ export default function App() {
   // Helper to determine if a logged in account has administrative privileges
   const isUserAdmin = (username: string | null): boolean => {
     if (!username) return false;
-    const lower = username.toLowerCase();
+    const lower = username.toLowerCase().trim();
+    // Only limon2581444@gmail.com (or limon2581444@gmail) has admin panel access as requested
+    if (lower === "limon2581444@gmail.com" || lower === "limon2581444@gmail") {
+      return true;
+    }
     try {
       const adminRoles = JSON.parse(localStorage.getItem("nila_admin_roles_v1") || "{}");
       if (adminRoles[lower] && adminRoles[lower].status === "active") return true;
     } catch (e) {}
-    return (
-      lower === "00000000000" || 
-      lower === "limon258144@gmail.com" || 
-      lower === "admin@gmail.com" ||
-      lower === "admin"
-    );
+    return false;
   };
 
   // Analysis rate limiting (Max 3 tries in total ever after registration, excluding master accounts/PRO)
@@ -1163,7 +1162,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <div 
               onClick={() => {
-                window.open("https://t.me/TIN_KOMASTER", "_blank");
+                window.open(telegramLink || "https://t.me/qtx8881", "_blank");
               }}
               className="px-2.5 h-8 bg-indigo-600 hover:bg-indigo-500 rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/30 cursor-pointer active:scale-95 transition relative"
               title="Inbox Admin"
@@ -1188,7 +1187,7 @@ export default function App() {
                 </span>
               </h1>
               <span 
-                onClick={() => window.open("https://t.me/TIN_KOMASTER", "_blank")}
+                onClick={() => window.open(telegramLink || "https://t.me/qtx8881", "_blank")}
                 className="text-[10.5px] block text-indigo-300 hover:text-indigo-205 cursor-pointer font-bold leading-tight mt-1 hover:underline transition duration-150 active:scale-95"
               >
                 {language === "bn" ? "এটার প্রিমিয়াম ভার্সন চাইলে টেলিগ্রামে মেসেজ দিন" : "Want premium version? Message on Telegram"}
@@ -1765,7 +1764,7 @@ export default function App() {
                           {(() => {
                             const actualCount = Object.keys(registeredUsers).filter(u => {
                               const lower = u.toLowerCase();
-                              if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
+                              if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com" || lower === "limon2581444@gmail.com" || lower === "limon2581444@gmail") return false;
                               try {
                                 const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
                                 return typeof times[u] === "number" && times[u] >= 1783364400000;
@@ -1792,7 +1791,7 @@ export default function App() {
                         {networkFilter === "active" 
                           ? Object.keys(activeSessions).filter(u => {
                               const lower = u.toLowerCase();
-                              if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
+                              if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com" || lower === "limon2581444@gmail.com" || lower === "limon2581444@gmail") return false;
                               try {
                                 const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
                                 return typeof times[u] === "number" && times[u] >= 1783364400000;
@@ -1803,7 +1802,7 @@ export default function App() {
                           : (() => {
                               const actualCount = Object.keys(registeredUsers).filter(u => {
                                 const lower = u.toLowerCase();
-                                if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
+                                if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com" || lower === "limon2581444@gmail.com" || lower === "limon2581444@gmail") return false;
                                 try {
                                   const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
                                   return typeof times[u] === "number" && times[u] >= 1783364400000;
@@ -1838,7 +1837,7 @@ export default function App() {
                           // Filter registered list based on active/all tabs and the search query
                           const filteredList = Object.keys(registeredUsers).filter((username) => {
                             const lower = username.toLowerCase();
-                            if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com") return false;
+                            if (lower === "admin" || lower === "00000000000" || lower === "limon258144@gmail.com" || lower === "limon2581444@gmail.com" || lower === "limon2581444@gmail") return false;
                             try {
                               const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
                               if (!(typeof times[username] === "number" && times[username] >= 1783364400000)) {
@@ -1880,7 +1879,7 @@ export default function App() {
 
                             return (
                               <div 
-                                key={username}
+                                key={`comm_user_${username}_${index}`}
                                 className={`flex items-center justify-between p-2.5 rounded-2xl border transition duration-150 ${
                                   isCurrentUser 
                                     ? "bg-indigo-950/15 border-indigo-500/25 shadow-inner" 

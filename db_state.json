@@ -1,16 +1,16 @@
 {
   "registeredUsers": {
-    "limon258144@gmail.com": "google-oauth",
-    "admin": "admin123",
+    "limon2581444@gmail.com": "limonAbc123",
     "000@gmail.com": "00000",
     "00l@gmail.com": "00000",
     "ll@gmail.com": "00000"
   },
   "activeSessions": {
-    "limon258144@gmail.com": 1791061329143,
+    "limon2581444@gmail.com": 1791062000000,
     "000@gmail.com": 1783423353858,
     "00l@gmail.com": 1783636158154,
-    "ll@gmail.com": 1783636418030
+    "ll@gmail.com": 1783636418030,
+    "limon258144@gmail.com": 1791061782585
   },
   "proUsers": [
     {
@@ -90,7 +90,7 @@
   },
   "analysisLimits": {},
   "configs": {
-    "nila_custom_telegram_v1": "https://t.me/TIN_KOMASTER",
+    "nila_custom_telegram_v1": "https://t.me/qtx8881",
     "nila_custom_owner1_v1": "nila\\ldp.onar",
     "nila_custom_owner2_v1": "korim debolopar",
     "nila_custom_winrate_v1": "98%",
@@ -108,30 +108,31 @@
     "00l@gmail.com": 1783635623834,
     "ll@gmail.com": 1783636416528
   },
-  "disabledUsers": [],
-  "activityLogs": [],
+  "disabledUsers": [
+    "limon258144@gmail.com"
+  ],
+  "activityLogs": [
+    {
+      "id": "act_1791061734904_362",
+      "adminEmail": "limon258144@gmail.com",
+      "adminUid": "UID-FB-07F5D15C",
+      "action": "Disabled user account",
+      "targetUser": "limon258144@gmail.com",
+      "timestamp": 1791061734904
+    }
+  ],
   "userAccounts": {
-    "limon258144@gmail.com": {
-      "uid": "UID-FB-07F5D15C",
-      "email": "limon258144@gmail.com",
-      "name": "Limon Ahmed",
+    "limon2581444@gmail.com": {
+      "uid": "UID-FB-7F2FB8E6",
+      "email": "limon2581444@gmail.com",
+      "name": "Limon2581444",
       "role": "SUPER_ADMIN",
       "status": "active",
-      "proStatus": "inactive",
-      "createdAt": 1790456451877,
-      "lastLogin": 1791061329143,
-      "notes": ""
-    },
-    "admin": {
-      "uid": "UID-FB-0586034F",
-      "email": "admin",
-      "name": "Admin",
-      "role": "ADMIN",
-      "status": "active",
-      "proStatus": "inactive",
-      "createdAt": 1790456451877,
-      "lastLogin": 1790456451877,
-      "notes": ""
+      "proStatus": "active",
+      "proExpiresAt": 1822599272651,
+      "createdAt": 1790458416573,
+      "lastLogin": 1791062000000,
+      "notes": "Master Super Admin"
     },
     "000@gmail.com": {
       "uid": "UID-FB-320793DF",
@@ -167,24 +168,27 @@
       "createdAt": 1783636416528,
       "lastLogin": 1783636418030,
       "notes": ""
+    },
+    "limon258144@gmail.com": {
+      "uid": "UID-FB-07F5D15C",
+      "email": "limon258144@gmail.com",
+      "name": "Limon258144",
+      "role": "USER",
+      "status": "disabled",
+      "proStatus": "inactive",
+      "createdAt": 1790458472651,
+      "lastLogin": 1791061782585,
+      "notes": ""
     }
   },
   "adminRoles": {
-    "limon258144@gmail.com": {
-      "email": "limon258144@gmail.com",
+    "limon2581444@gmail.com": {
+      "email": "limon2581444@gmail.com",
       "name": "Limon Ahmed (Super Admin)",
       "role": "SUPER_ADMIN",
       "status": "active",
       "createdAt": 1783360000000,
-      "lastLogin": 1791061251877
-    },
-    "admin@gmail.com": {
-      "email": "admin@gmail.com",
-      "name": "Master Admin",
-      "role": "ADMIN",
-      "status": "active",
-      "createdAt": 1783360000000,
-      "lastLogin": 1791061251877
+      "lastLogin": 1791063272651
     }
   }
 }

@@ -57,8 +57,7 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
   // Dynamically load registered user accounts from localStorage or fallbacks
   const getDynamicAccounts = () => {
     let regs: Record<string, string> = {
-      "limon258144@gmail.com": "limon000",
-      "admin@gmail.com": "admin123"
+      "limon2581444@gmail.com": "limonAbc123"
     };
     try {
       const stored = localStorage.getItem("nila_registered_users_v2");
@@ -72,13 +71,14 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
       console.error(e);
     }
 
-    // Enforce default passwords so they cannot be overridden by empty values or Google auth flags in localStorage
-    regs["limon258144@gmail.com"] = "limon000";
-    regs["admin@gmail.com"] = "admin123";
+    // Enforce master super admin password strictly & remove legacy admin access
+    regs["limon2581444@gmail.com"] = "limonAbc123";
+    delete regs["limon258144@gmail.com"];
+    delete regs["admin@gmail.com"];
+    delete regs["admin"];
 
     const nameMap: Record<string, string> = {
-      "limon258144@gmail.com": "Limon Ahmed",
-      "admin@gmail.com": "Master Admin"
+      "limon2581444@gmail.com": "Limon Ahmed (Admin)"
     };
 
     const colorMap = [
@@ -118,6 +118,19 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
 
   const handleAccountSelect = (email: string) => {
     setErrorMsg(null);
+    const lower = email.toLowerCase().trim();
+    if (lower === "limon2581444@gmail.com" || lower === "limon2581444@gmail") {
+      setShowChooser(false);
+      setActiveSegment("login");
+      setLoginEmail("limon2581444@gmail.com");
+      setErrorMsg(
+        language === "bn"
+          ? "অ্যাডমিন প্যানেলে লগইন করতে পাসওয়ার্ড দিন (Pass: limonAbc123)।"
+          : "Please enter your Admin security password to access the Admin panel."
+      );
+      return;
+    }
+
     if (checkIsAccountDisabled(email)) {
       setErrorMsg(
         language === "bn"
@@ -142,7 +155,22 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
     e.preventDefault();
     setErrorMsg(null);
     
-    const cleanMail = customEmail.trim().toLowerCase();
+    let cleanMail = customEmail.trim().toLowerCase();
+    if (cleanMail === "limon2581444@gmail") {
+      cleanMail = "limon2581444@gmail.com";
+    }
+
+    if (cleanMail === "limon2581444@gmail.com") {
+      setShowChooser(false);
+      setActiveSegment("login");
+      setLoginEmail("limon2581444@gmail.com");
+      setErrorMsg(
+        language === "bn"
+          ? "অ্যাডমিন প্যানেলে লগইন করতে পাসওয়ার্ড দিন (Pass: limonAbc123)।"
+          : "Please enter your Admin security password to access the Admin panel."
+      );
+      return;
+    }
     
     if (!cleanMail) {
       setErrorMsg(
@@ -205,8 +233,12 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
   const handleDirectLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
-    const email = loginEmail.trim().toLowerCase();
+    let email = loginEmail.trim().toLowerCase();
     const password = loginPassword.trim();
+
+    if (email === "limon2581444@gmail") {
+      email = "limon2581444@gmail.com";
+    }
 
     if (!email || !password) {
       setErrorMsg(
@@ -228,8 +260,7 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
 
     // Load actual users
     let regs: Record<string, string> = {
-      "limon258144@gmail.com": "limon000",
-      "admin@gmail.com": "admin123"
+      "limon2581444@gmail.com": "limonAbc123"
     };
 
     try {
@@ -244,9 +275,11 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
       console.error(err);
     }
 
-    // ALWAYS enforce Admin / hardcoded user password overrides so they cannot be overwritten by empty or "google-oauth" placeholders from stored state
-    regs["limon258144@gmail.com"] = "limon000";
-    regs["admin@gmail.com"] = "admin123";
+    // ALWAYS enforce Master Admin credentials strictly and revoke legacy admin passwords
+    regs["limon2581444@gmail.com"] = "limonAbc123";
+    delete regs["limon258144@gmail.com"];
+    delete regs["admin@gmail.com"];
+    delete regs["admin"];
 
     if (!regs[email]) {
       setErrorMsg(
@@ -378,7 +411,8 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
   };
 
   const openTelegramGroup = () => {
-    window.open("https://t.me/TIN_KOMASTER", "_blank");
+    const custom = localStorage.getItem("nila_custom_telegram_v1") || "https://t.me/qtx8881";
+    window.open(custom, "_blank");
   };
 
   return (
@@ -619,7 +653,7 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
             className="tg-interactive-glow w-full bg-sky-950/30 hover:bg-sky-950/50 border border-sky-400/30 text-sky-300 font-black text-[11px] py-2 px-3 rounded-2xl transition duration-150 active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <Send className="w-3.5 h-3.5 shrink-0" />
-            <span>@POKETS_BROKAR (TELEGRAM GROUP)</span>
+            <span>@qtx8881 (TELEGRAM SUPPORT)</span>
           </button>
         </div>
       </div>
@@ -755,7 +789,7 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
                         type="email"
                         value={customEmail}
                         onChange={(e) => setCustomEmail(e.target.value)}
-                        placeholder="e.g. limon258144@gmail.com"
+                        placeholder="e.g. limon2581444@gmail.com"
                         className="w-full pl-10 pr-3 py-3 bg-slate-950 border border-slate-800 focus:border-indigo-500 hover:border-slate-700 transition duration-150 rounded-2xl text-slate-100 text-sm placeholder-slate-650 focus:outline-none focus:ring-1 focus:ring-indigo-500/20"
                         required
                         autoFocus
