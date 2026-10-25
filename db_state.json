@@ -1,16 +1,12 @@
 {
   "registeredUsers": {
     "limon2581444@gmail.com": "limonAbc123",
-    "000@gmail.com": "00000",
-    "00l@gmail.com": "00000",
-    "ll@gmail.com": "00000"
+    "000@gmail.com": "PROTECTED",
+    "00l@gmail.com": "PROTECTED",
+    "ll@gmail.com": "PROTECTED"
   },
   "activeSessions": {
-    "limon2581444@gmail.com": 1791062000000,
-    "000@gmail.com": 1783423353858,
-    "00l@gmail.com": 1783636158154,
-    "ll@gmail.com": 1783636418030,
-    "limon258144@gmail.com": 1791061782585
+    "limon2581444@gmail.com": 1792562931481
   },
   "proUsers": [
     {
@@ -99,7 +95,8 @@
     "nila_custom_trx_v1": "TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x",
     "nila_custom_ltc_v1": "01767093032",
     "nila_custom_bkash_inst_v1": "* এই বিকাশ পার্সোনাল নাম্বারে সমপরিমাণ টাকা Send Money করুন।",
-    "nila_custom_crypto_inst_v1": "* Send exactly the payment amount to this receiver wallet."
+    "nila_custom_crypto_inst_v1": "* Send exactly the payment amount to this receiver wallet.",
+    "nila_sessions_revoked_before_v1": "1792563600000"
   },
   "deletedPayments": [],
   "deletedUsers": [],
@@ -112,6 +109,14 @@
     "limon258144@gmail.com"
   ],
   "activityLogs": [
+    {
+      "id": "act_1792562572277_13",
+      "adminEmail": "limon2581444@gmail.com",
+      "adminUid": "UID-FB-7F2FB8E6",
+      "action": "Activated user account",
+      "targetUser": "limon258144@gmail.com",
+      "timestamp": 1792562572277
+    },
     {
       "id": "act_1791061734904_362",
       "adminEmail": "limon258144@gmail.com",
@@ -129,9 +134,9 @@
       "role": "SUPER_ADMIN",
       "status": "active",
       "proStatus": "active",
-      "proExpiresAt": 1822599272651,
+      "proExpiresAt": 1824098934924,
       "createdAt": 1790458416573,
-      "lastLogin": 1791062000000,
+      "lastLogin": 1792562931481,
       "notes": "Master Super Admin"
     },
     "000@gmail.com": {
@@ -176,7 +181,7 @@
       "role": "USER",
       "status": "disabled",
       "proStatus": "inactive",
-      "createdAt": 1790458472651,
+      "createdAt": 1791958134924,
       "lastLogin": 1791061782585,
       "notes": ""
     }
@@ -188,7 +193,7 @@
       "role": "SUPER_ADMIN",
       "status": "active",
       "createdAt": 1783360000000,
-      "lastLogin": 1791063272651
+      "lastLogin": 1792562934924
     }
   }
 }

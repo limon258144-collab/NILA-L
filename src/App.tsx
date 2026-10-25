@@ -53,6 +53,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [forceLogoutNotice, setForceLogoutNotice] = useState(false);
 
   // States to keep track of active sessions and registered users
   const [registeredUsers, setRegisteredUsers] = useState<Record<string, string>>({});
@@ -565,10 +566,21 @@ export default function App() {
     const intervalId = setInterval(() => {
       syncWithServer();
     }, 5000);
+
+    const handleForceLogout = () => {
+      setCurrentUser(null);
+      setShowAdminPanel(false);
+      localStorage.removeItem("nila_logged_in_user_v1");
+      localStorage.removeItem("nila_session_start_v1");
+      setForceLogoutNotice(true);
+    };
+
     window.addEventListener("nila_settings_updated", refreshCustomConfig);
+    window.addEventListener("nila_force_logout", handleForceLogout);
     return () => {
       clearInterval(intervalId);
       window.removeEventListener("nila_settings_updated", refreshCustomConfig);
+      window.removeEventListener("nila_force_logout", handleForceLogout);
     };
   }, []);
 
@@ -617,7 +629,15 @@ export default function App() {
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem("nila_logged_in_user_v1");
-      if (storedUser) {
+      const sessionStart = parseInt(localStorage.getItem("nila_session_start_v1") || "0", 10);
+      const revokedBefore = parseInt(localStorage.getItem("nila_sessions_revoked_before_v1") || "0", 10);
+      const isSuper = storedUser === "limon2581444@gmail.com" || storedUser === "limon2581444@gmail";
+
+      if (storedUser && !isSuper && (sessionStart <= revokedBefore || isUserDisabled(storedUser))) {
+        localStorage.removeItem("nila_logged_in_user_v1");
+        localStorage.removeItem("nila_session_start_v1");
+        setForceLogoutNotice(true);
+      } else if (storedUser) {
         setCurrentUser(storedUser);
         if (isUserAdmin(storedUser)) {
           setShowAdminPanel(true);
@@ -1240,6 +1260,19 @@ export default function App() {
               </button>
             )}
 
+            {/* Logout button */}
+            {currentUser && (
+              <button
+                id="logout-btn"
+                onClick={() => setShowLogoutConfirm(true)}
+                className="px-2.5 py-1.5 rounded-xl bg-rose-950/60 border border-rose-500/50 text-rose-300 hover:bg-rose-900/70 hover:text-white transition duration-150 active:scale-90 cursor-pointer flex items-center gap-1.5 shadow-md shadow-rose-950/40 text-xs font-bold"
+                title={language === "bn" ? "লগ আউট" : "Log Out"}
+              >
+                <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                <span className="text-[11px] font-extrabold">{language === "bn" ? "লগআউট" : "Logout"}</span>
+              </button>
+            )}
+
 
 
           </div>
@@ -1255,14 +1288,41 @@ export default function App() {
           {isProUser && <RainEffect />}
           
           {!currentUser ? (
-            <LoginScreen 
-              language={language === "bn" ? "bn" : "en"} 
-              onLoginSuccess={(un) => {
-                setCurrentUser(un);
-                localStorage.setItem("nila_logged_in_user_v1", un);
-                if (isUserAdmin(un)) {
-                  setShowAdminPanel(true);
-                }
+            <div className="space-y-3">
+              {forceLogoutNotice && (
+                <div className="bg-rose-950/40 border border-rose-500/30 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-rose-300 animate-fade-in relative">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <div className="flex-1 text-left">
+                    <p className="font-bold">
+                      {language === "bn"
+                        ? "অ্যাডমিন কর্তৃক পূর্বের সকল মেম্বার সেশন লগআউট করা হয়েছে।"
+                        : "All previous member sessions were logged out by administrator."}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {language === "bn"
+                        ? "অনুগ্রহ করে আপনার সঠিক ইমেইল ও পাসওয়ার্ড দিয়ে পুনরায় লগইন করুন।"
+                        : "Please log in again with your email and password to start a new session."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setForceLogoutNotice(false)}
+                    className="text-slate-400 hover:text-white text-xs p-1 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+              <LoginScreen 
+                language={language === "bn" ? "bn" : "en"} 
+                onLoginSuccess={(un) => {
+                  setCurrentUser(un);
+                  localStorage.setItem("nila_logged_in_user_v1", un);
+                  localStorage.setItem("nila_session_start_v1", Date.now().toString());
+                  setForceLogoutNotice(false);
+                  if (isUserAdmin(un)) {
+                    setShowAdminPanel(true);
+                  }
                 try {
                   const storedSessions = localStorage.getItem("nila_active_sessions_v1");
                   let sessions: Record<string, number> = {};
@@ -1285,7 +1345,8 @@ export default function App() {
                 }
               }} 
             />
-          ) : isUserDisabled(currentUser) ? (
+          </div>
+        ) : isUserDisabled(currentUser) ? (
             <div className="flex flex-col items-center justify-center p-6 text-center space-y-4 my-auto min-h-[460px] animate-fade-in">
               <div className="w-16 h-16 rounded-full bg-rose-500/10 border-2 border-rose-500/30 flex items-center justify-center text-rose-400">
                 <AlertCircle className="w-8 h-8 animate-bounce" />
@@ -1342,6 +1403,7 @@ export default function App() {
               language={language} 
               currentUser={currentUser}
               onBackToApp={() => setShowAdminPanel(false)} 
+              onLogout={() => setShowLogoutConfirm(true)}
             />
           ) : (
             <>
@@ -1829,8 +1891,8 @@ export default function App() {
                     {/* Users list mapped */}
                     <div className="space-y-2 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
                       {Object.keys(registeredUsers).length === 0 ? (
-                        <div className="text-center py-6 text-slate-500 text-xs font-semibold italic">
-                          {language === "bn" ? "মেম্বার তালিকা লোড হচ্ছে..." : "Loading member directory..."}
+                        <div className="text-center py-6 text-slate-500 text-xs font-semibold">
+                          {language === "bn" ? "কোনো মেম্বার অ্যাকাউন্ট পাওয়া যায়নি" : "No registered members found"}
                         </div>
                       ) : (
                         (() => {
@@ -2162,6 +2224,21 @@ export default function App() {
                   </button>
                 )
               )}
+
+              {/* Drawer Logout Account Action */}
+              <div className="pt-2 border-t border-slate-800/60 mt-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowHistoryDrawer(false);
+                    setShowLogoutConfirm(true);
+                  }}
+                  className="w-full py-2.5 px-3 bg-slate-900/90 hover:bg-rose-950/40 border border-slate-800 hover:border-rose-500/40 text-rose-400 font-bold text-xs rounded-2xl transition duration-150 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>{language === "bn" ? "অ্যাকাউন্ট থেকে লগ আউট করুন" : "Log Out from Account"}</span>
+                </button>
+              </div>
 
             </div>
           </div>

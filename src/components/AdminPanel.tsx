@@ -13,7 +13,8 @@ import {
   Shield, 
   Send,
   MessageCircle,
-  RefreshCw
+  RefreshCw,
+  LogOut
 } from "lucide-react";
 import { syncWithServer, executeAdminAction } from "../sync";
 import { UserAccount, PaymentRequestItem, ActivityLogItem, AdminRoleItem } from "../types";
@@ -28,9 +29,10 @@ interface AdminPanelProps {
   language: "bn" | "en";
   onBackToApp: () => void;
   currentUser?: string | null;
+  onLogout?: () => void;
 }
 
-export default function AdminPanel({ language, onBackToApp, currentUser }: AdminPanelProps) {
+export default function AdminPanel({ language, onBackToApp, currentUser, onLogout }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "payments" | "users" | "admins" | "analytics" | "activity" | "support" | "settings">("overview");
   const [userFilter, setUserFilter] = useState<string>("ALL");
   const [paymentFilter, setPaymentFilter] = useState<"all" | "pending" | "approved" | "disabled">("all");
@@ -272,6 +274,38 @@ export default function AdminPanel({ language, onBackToApp, currentUser }: Admin
     }
   };
 
+  const handleLogoutAllMembers = async () => {
+    setIsSyncing(true);
+    const res = await executeAdminAction(adminEmail, "LOGOUT_ALL_MEMBERS", "ALL_MEMBERS");
+    setIsSyncing(false);
+    if (res.success) {
+      showToast(
+        language === "bn"
+          ? "পূর্বের সকল মেম্বারকে সফলভাবে লগআউট করা হয়েছে!"
+          : "All previous member sessions have been successfully logged out!"
+      );
+      loadLocalState();
+    } else {
+      showToast(`Failed: ${res.error}`);
+    }
+  };
+
+  const handleLogoutUser = async (email: string) => {
+    setIsSyncing(true);
+    const res = await executeAdminAction(adminEmail, "LOGOUT_USER", email);
+    setIsSyncing(false);
+    if (res.success) {
+      showToast(
+        language === "bn"
+          ? `${email} মেম্বারকে সফলভাবে লগআউট করা হয়েছে!`
+          : `User ${email} logged out successfully!`
+      );
+      loadLocalState();
+    } else {
+      showToast(`Failed: ${res.error}`);
+    }
+  };
+
   const handleAddAdmin = async (admEmail: string, name: string, role: "SUPER_ADMIN" | "ADMIN") => {
     const res = await executeAdminAction(adminEmail, "ADD_ADMIN", admEmail, { email: admEmail, name, role });
     if (res.success) {
@@ -369,21 +403,35 @@ export default function AdminPanel({ language, onBackToApp, currentUser }: Admin
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setIsSyncing(true);
-            syncWithServer().then(() => {
-              loadLocalState();
-              setIsSyncing(false);
-              showToast("Database synchronized!");
-            });
-          }}
-          className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition cursor-pointer active:scale-95"
-          title="Force Sync Database"
-        >
-          <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin text-indigo-400" : ""}`} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setIsSyncing(true);
+              syncWithServer().then(() => {
+                loadLocalState();
+                setIsSyncing(false);
+                showToast("Database synchronized!");
+              });
+            }}
+            className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition cursor-pointer active:scale-95"
+            title="Force Sync Database"
+          >
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin text-indigo-400" : ""}`} />
+          </button>
+
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              className="px-2.5 py-1.5 rounded-xl bg-rose-950/60 border border-rose-500/50 text-rose-300 hover:bg-rose-900/70 hover:text-white transition cursor-pointer active:scale-95 flex items-center gap-1.5 text-xs font-bold shadow-md shadow-rose-950/40"
+              title={language === "bn" ? "লগ আউট" : "Log Out"}
+            >
+              <LogOut className="w-3.5 h-3.5 text-rose-400" />
+              <span className="text-[11px] font-extrabold">{language === "bn" ? "লগআউট" : "Logout"}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Navigation Tabs Bar */}
@@ -533,6 +581,8 @@ export default function AdminPanel({ language, onBackToApp, currentUser }: Admin
           onActivatePro={handleActivatePro}
           onDeactivatePro={handleDeactivatePro}
           onResetPassword={handleResetPassword}
+          onLogoutAllMembers={handleLogoutAllMembers}
+          onLogoutUser={handleLogoutUser}
           onAddUser={async (email, pass, name) => {
             const usersObj = JSON.parse(localStorage.getItem("nila_registered_users_v2") || "{}");
             usersObj[email] = pass;

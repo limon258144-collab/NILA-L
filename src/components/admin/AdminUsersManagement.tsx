@@ -18,7 +18,8 @@ import {
   X,
   Plus,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  LogOut
 } from "lucide-react";
 import { UserAccount, PaymentRequestItem, UserAccountStatus, ProAccountStatus } from "../../types";
 
@@ -35,6 +36,8 @@ interface AdminUsersManagementProps {
   onDeactivatePro: (email: string) => void;
   onResetPassword: (email: string, newPass: string) => void;
   onAddUser?: (email: string, pass: string, name: string) => void;
+  onLogoutAllMembers?: () => void;
+  onLogoutUser?: (email: string) => void;
 }
 
 export default function AdminUsersManagement({
@@ -60,6 +63,7 @@ export default function AdminUsersManagement({
   const [newName, setNewName] = useState("");
   const [newPass, setNewPass] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showLogoutAllConfirm, setShowLogoutAllConfirm] = useState(false);
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -154,16 +158,30 @@ export default function AdminUsersManagement({
           </p>
         </div>
 
-        {onAddUser && (
-          <button
-            type="button"
-            onClick={() => setShowAddModal(true)}
-            className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition self-start sm:self-auto cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>{language === "bn" ? "নতুন ইউজার যুক্ত করুন" : "Add User"}</span>
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {onLogoutAllMembers && (
+            <button
+              type="button"
+              onClick={() => setShowLogoutAllConfirm(true)}
+              className="px-3 py-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600 border border-rose-500/40 text-rose-300 hover:text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer active:scale-95 shadow-sm"
+              title="পূর্বের সকল মেম্বারকে তাৎক্ষণিক লগআউট করান"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>{language === "bn" ? "সকল মেম্বারকে লগআউট করুন" : "Logout All Members"}</span>
+            </button>
+          )}
+
+          {onAddUser && (
+            <button
+              type="button"
+              onClick={() => setShowAddModal(true)}
+              className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{language === "bn" ? "নতুন ইউজার যুক্ত করুন" : "Add User"}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search Input */}
@@ -378,6 +396,22 @@ export default function AdminUsersManagement({
                     <Key className="w-3 h-3" />
                     RESET PASSWORD
                   </button>
+
+                  {/* Individual Force Logout Button */}
+                  {onLogoutUser && u.role !== "SUPER_ADMIN" && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onLogoutUser(u.email);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-rose-950/40 hover:bg-rose-900/50 border border-rose-500/30 text-rose-300 text-[10px] font-bold transition flex items-center gap-1 cursor-pointer active:scale-95"
+                      title={language === "bn" ? "এই মেম্বারকে লগআউট করান" : "Force Logout User"}
+                    >
+                      <LogOut className="w-3 h-3" />
+                      {language === "bn" ? "লগআউট" : "LOGOUT"}
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -744,6 +778,47 @@ export default function AdminUsersManagement({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Logout All Members Confirmation Modal */}
+      {showLogoutAllConfirm && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-[#111116] border-2 border-rose-500/40 rounded-3xl p-6 max-w-sm w-full space-y-4 shadow-2xl text-center">
+            <div className="w-14 h-14 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/30">
+              <LogOut className="w-7 h-7 animate-pulse text-rose-500" />
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="text-white font-extrabold text-base uppercase tracking-wide">
+                {language === "bn" ? "সকল মেম্বারকে লগআউট করবেন?" : "Logout All Members?"}
+              </h4>
+              <p className="text-slate-300 text-xs leading-relaxed font-semibold">
+                {language === "bn"
+                  ? "আপনি কি নিশ্চিত যে পূর্বের সকল মেম্বারের সক্রিয় সেশন অবিলম্বে লগআউট করতে চান? সকল মেম্বার স্বয়ংক্রিয়ভাবে অ্যাপ থেকে লগআউট হয়ে যাবে এবং পুনরায় লগইন করতে হবে।"
+                  : "Are you sure you want to invalidate all member sessions? All members will be immediately forced to log out."}
+              </p>
+            </div>
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowLogoutAllConfirm(false)}
+                className="flex-1 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-bold py-2.5 rounded-xl transition cursor-pointer"
+              >
+                {language === "bn" ? "বাতিল" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLogoutAllConfirm(false);
+                  if (onLogoutAllMembers) onLogoutAllMembers();
+                }}
+                className="flex-1 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold py-2.5 rounded-xl transition cursor-pointer active:scale-95 shadow-lg shadow-rose-600/30"
+              >
+                {language === "bn" ? "লগআউট করুন" : "Yes, Log Out All"}
+              </button>
+            </div>
           </div>
         </div>
       )}

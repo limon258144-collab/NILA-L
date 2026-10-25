@@ -287,9 +287,21 @@ app.post("/api/db/sync", (req, res) => {
       delete db.registeredUsers[un];
     }
 
-    // 2. Merge activeSessions
+    // 2. Merge activeSessions (strictly respecting revocation timestamp so logged-out sessions cannot resurrect)
+    const revokedBefore = parseInt(db.configs?.["nila_sessions_revoked_before_v1"] || "0", 10);
     if (payload.activeSessions) {
       for (const [username, timestamp] of Object.entries(payload.activeSessions)) {
+        const lower = username.toLowerCase();
+        const isMaster = lower === "limon2581444@gmail.com" || lower === "limon2581444@gmail";
+        const userRevokedAt = parseInt(db.configs?.[`nila_user_revoked_${lower}`] || "0", 10);
+        
+        if (!isMaster && revokedBefore > 0 && (timestamp as number) <= revokedBefore) {
+          continue;
+        }
+        if (!isMaster && userRevokedAt > 0 && (timestamp as number) <= userRevokedAt) {
+          continue;
+        }
+
         const existing = db.activeSessions[username];
         if (existing === undefined || (timestamp as number) > existing) {
           db.activeSessions[username] = timestamp as number;
@@ -298,6 +310,15 @@ app.post("/api/db/sync", (req, res) => {
     }
     for (const un of mergedDeletedUsers) {
       delete db.activeSessions[un];
+    }
+    if (revokedBefore > 0 && db.activeSessions) {
+      for (const [username, ts] of Object.entries(db.activeSessions)) {
+        const lower = username.toLowerCase();
+        const isMaster = lower === "limon2581444@gmail.com" || lower === "limon2581444@gmail";
+        if (!isMaster && (ts as number) <= revokedBefore) {
+          delete db.activeSessions[username];
+        }
+      }
     }
 
     // 3. Merge proUsers
@@ -688,6 +709,37 @@ app.post("/api/admin/action", (req, res): any => {
           db.userAccounts[adminToRemove].role = "USER";
         }
         logDescription = `Removed admin role from: ${adminToRemove}`;
+        break;
+      }
+
+      case "LOGOUT_ALL_MEMBERS": {
+        const now = Date.now();
+        const prevCount = Object.keys(db.activeSessions || {}).length;
+        const newSessions: Record<string, number> = {};
+        if (db.activeSessions) {
+          for (const [email, ts] of Object.entries(db.activeSessions)) {
+            const lower = email.toLowerCase();
+            if (lower === "limon2581444@gmail.com" || lower === "limon2581444@gmail" || lower === adminEmail.toLowerCase()) {
+              newSessions[email] = ts;
+            }
+          }
+        }
+        db.activeSessions = newSessions;
+        if (!db.configs) db.configs = {};
+        db.configs["nila_sessions_revoked_before_v1"] = now.toString();
+        logDescription = `Logged out all previous member sessions (${prevCount} total sessions revoked)`;
+        break;
+      }
+
+      case "LOGOUT_USER": {
+        if (target) {
+          if (db.activeSessions) {
+            delete db.activeSessions[target];
+          }
+          if (!db.configs) db.configs = {};
+          db.configs[`nila_user_revoked_${target.toLowerCase()}`] = Date.now().toString();
+          logDescription = `Force logged out user session: ${target}`;
+        }
         break;
       }
 

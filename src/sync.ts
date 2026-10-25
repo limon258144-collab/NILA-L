@@ -9,6 +9,7 @@ const CONFIG_KEYS = [
   "nila_custom_ltc_v1",
   "nila_custom_bkash_inst_v1",
   "nila_custom_crypto_inst_v1",
+  "nila_sessions_revoked_before_v1",
 ];
 
 let isSyncing = false;
@@ -115,11 +116,62 @@ export async function syncWithServer() {
       delete filteredRegisteredUsers[un];
     });
 
-    // 3. Merge active sessions safely
-    const filteredActiveSessions = { ...(state.activeSessions || {}), ...freshLocalSessions };
+    // 3. Merge active sessions safely (strictly respecting revocation timestamp)
+    const sessionsRevokedBefore = parseInt(state.configs?.["nila_sessions_revoked_before_v1"] || "0", 10);
+    const filteredActiveSessions: Record<string, number> = {};
+
+    // First populate from server state
+    for (const [user, ts] of Object.entries(state.activeSessions || {})) {
+      const lower = user.toLowerCase();
+      const isMaster = lower === "limon2581444@gmail.com" || lower === "limon2581444@gmail";
+      const userRevokedAt = parseInt(state.configs?.[`nila_user_revoked_${lower}`] || "0", 10);
+      if (!isMaster && sessionsRevokedBefore > 0 && (ts as number) <= sessionsRevokedBefore) continue;
+      if (!isMaster && userRevokedAt > 0 && (ts as number) <= userRevokedAt) continue;
+      if (!serverDeletedUsers.includes(user)) {
+        filteredActiveSessions[user] = ts as number;
+      }
+    }
+
+    // Merge fresh local sessions only if not revoked
+    for (const [user, ts] of Object.entries(freshLocalSessions)) {
+      const lower = user.toLowerCase();
+      const isMaster = lower === "limon2581444@gmail.com" || lower === "limon2581444@gmail";
+      const userRevokedAt = parseInt(state.configs?.[`nila_user_revoked_${lower}`] || "0", 10);
+      if (!isMaster && sessionsRevokedBefore > 0 && (ts as number) <= sessionsRevokedBefore) continue;
+      if (!isMaster && userRevokedAt > 0 && (ts as number) <= userRevokedAt) continue;
+      if (!serverDeletedUsers.includes(user)) {
+        if (!filteredActiveSessions[user] || (ts as number) > filteredActiveSessions[user]) {
+          filteredActiveSessions[user] = ts as number;
+        }
+      }
+    }
     serverDeletedUsers.forEach(un => {
       delete filteredActiveSessions[un];
     });
+
+    // Check if current user on this client device must be force logged out
+    const loggedInUser = localStorage.getItem("nila_logged_in_user_v1");
+    if (loggedInUser) {
+      const lower = loggedInUser.toLowerCase();
+      const isMaster = lower === "limon2581444@gmail.com" || lower === "limon2581444@gmail";
+      if (!isMaster) {
+        const sessionStart = parseInt(localStorage.getItem("nila_session_start_v1") || "0", 10);
+        const userRevokedAt = parseInt(state.configs?.[`nila_user_revoked_${lower}`] || "0", 10);
+        const isDisabled = (state.disabledUsers || []).includes(lower) || state.userAccounts?.[lower]?.status === "disabled";
+        
+        const isSessionRevoked = (sessionsRevokedBefore > 0 && sessionStart <= sessionsRevokedBefore) ||
+                                (userRevokedAt > 0 && sessionStart <= userRevokedAt);
+
+        if (isSessionRevoked || isDisabled) {
+          localStorage.removeItem("nila_logged_in_user_v1");
+          localStorage.removeItem("nila_session_start_v1");
+          delete filteredActiveSessions[loggedInUser];
+          window.dispatchEvent(new CustomEvent("nila_force_logout", {
+            detail: { reason: isDisabled ? "disabled" : "revoked" }
+          }));
+        }
+      }
+    }
 
     // 4. Merge pro users safely
     const proMap = new Map<string, any>();
