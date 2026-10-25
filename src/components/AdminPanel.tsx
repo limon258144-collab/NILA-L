@@ -53,8 +53,8 @@ export default function AdminPanel({ language, onBackToApp, currentUser, onLogou
   const [globalAnnouncement, setGlobalAnnouncement] = useState("যেকোনো প্রয়োজনে নিচে দেওয়া টেলিগ্রাম লিংকে মেসেজ করুন");
   const [adminUsdt, setAdminUsdt] = useState("TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x");
   const [adminTrx, setAdminTrx] = useState("TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x");
-  const [adminLtc, setAdminLtc] = useState("01767093032");
-  const [adminBkashInst, setAdminBkashInst] = useState("* এই বিকাশ পার্সোনাল নাম্বারে সমপরিমাণ টাকা Send Money করুন।");
+  const [adminLtc, setAdminLtc] = useState("ইনবক্সে যোগাযোগ করুন");
+  const [adminBkashInst, setAdminBkashInst] = useState("* পেমেন্ট নম্বর পেতে ইনবক্সে যোগাযোগ করুন এবং লেনদেন সম্পন্ন করুন।");
 
   const adminEmail = (currentUser || "limon2581444@gmail.com").toLowerCase();
   const isSuperAdmin = adminEmail === "limon2581444@gmail.com" || adminEmail === "limon2581444@gmail" || adminRoles[adminEmail]?.role === "SUPER_ADMIN";
@@ -95,7 +95,12 @@ export default function AdminPanel({ language, onBackToApp, currentUser, onLogou
       const storedTrx = localStorage.getItem("nila_custom_trx_v1");
       if (storedTrx) setAdminTrx(storedTrx);
       const storedLtc = localStorage.getItem("nila_custom_ltc_v1");
-      if (storedLtc) setAdminLtc(storedLtc);
+      if (storedLtc && storedLtc !== "01767093032" && storedLtc !== "01700000000" && storedLtc !== "01568760651") {
+        setAdminLtc(storedLtc);
+      } else {
+        setAdminLtc("ইনবক্সে যোগাযোগ করুন");
+        localStorage.setItem("nila_custom_ltc_v1", "ইনবক্সে যোগাযোগ করুন");
+      }
       const storedBkashInst = localStorage.getItem("nila_custom_bkash_inst_v1");
       if (storedBkashInst) setAdminBkashInst(storedBkashInst);
     } catch (e) {

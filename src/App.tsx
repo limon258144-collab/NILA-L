@@ -69,8 +69,8 @@ export default function App() {
   const [showPaymentGateway, setShowPaymentGateway] = useState(false);
   const [walletUSDT, setWalletUSDT] = useState("TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x");
   const [walletTRX, setWalletTRX] = useState("TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x");
-  const [walletLTC, setWalletLTC] = useState("01767093032");
-  const [bkashInstruction, setBkashInstruction] = useState("* এই বিকাশ পার্সোনাল নাম্বারে সমপরিমাণ টাকা Send Money করুন।");
+  const [walletLTC, setWalletLTC] = useState("ইনবক্সে যোগাযোগ করুন");
+  const [bkashInstruction, setBkashInstruction] = useState("* পেমেন্ট নম্বর পেতে সরাসরি ইনবক্সে যোগাযোগ করুন এবং ট্রানজেকশন আইডি (TrxID) দিন।");
   const [cryptoInstruction, setCryptoInstruction] = useState("* Send exactly the payment amount to this receiver wallet.");
 
   // Payment workflow states
@@ -118,11 +118,11 @@ export default function App() {
       if (storedTrx) setWalletTRX(storedTrx);
 
       const storedLtc = localStorage.getItem("nila_custom_ltc_v1");
-      if (storedLtc && storedLtc !== "01700000000" && storedLtc !== "01568760651") {
+      if (storedLtc && storedLtc !== "01767093032" && storedLtc !== "01700000000" && storedLtc !== "01568760651") {
         setWalletLTC(storedLtc);
       } else {
-        setWalletLTC("01767093032");
-        localStorage.setItem("nila_custom_ltc_v1", "01767093032");
+        setWalletLTC("ইনবক্সে যোগাযোগ করুন");
+        localStorage.setItem("nila_custom_ltc_v1", "ইনবক্সে যোগাযোগ করুন");
       }
       
       const storedBkashInst = localStorage.getItem("nila_custom_bkash_inst_v1");
@@ -2389,8 +2389,9 @@ export default function App() {
                       </div>
                     </div>
                     
-                    <span className="text-[11px] font-bold text-[#e11d48] bg-pink-500/10 px-2.5 py-1 rounded-xl tracking-wide select-none font-mono">
-                      {walletLTC || "01767093032"}
+                    <span className="text-[11px] font-bold text-pink-400 bg-pink-500/10 px-2.5 py-1 rounded-xl tracking-wide select-none font-sans flex items-center gap-1">
+                      <Send className="w-3 h-3 text-pink-400 inline shrink-0" />
+                      <span>{walletLTC || "ইনবক্সে যোগাযোগ করুন"}</span>
                     </span>
                   </div>
 
@@ -2463,9 +2464,19 @@ export default function App() {
                     <div className="space-y-1.5 rounded-2xl bg-indigo-950/10 border border-indigo-500/10 p-3 animate-fade-in text-center">
                       <div className="flex items-center justify-between text-[10.5px] bg-transparent">
                         <span className="font-extrabold text-slate-400 uppercase tracking-widest text-[8.5px] font-mono">
-                          {selectedNetwork === "bKash (বিকাশ)" ? "bKash RECEIVER NUMBER (Send Money)" : `${selectedNetwork} ADDRESS`}
+                          {selectedNetwork === "bKash (বিকাশ)" ? "bKash PAYMENT / CONTACT" : `${selectedNetwork} ADDRESS`}
                         </span>
-                        {walletCopied ? (
+                        {selectedNetwork === "bKash (বিকাশ)" ? (
+                          <a
+                            href={telegramLink || "https://t.me/qtx8881"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-pink-400 hover:text-pink-300 font-extrabold text-[9px] uppercase tracking-wider underline transition cursor-pointer flex items-center gap-1"
+                          >
+                            <Send className="w-2.5 h-2.5" />
+                            {language === "bn" ? "ইনবক্সে মেসেজ দিন" : "Message in Inbox"}
+                          </a>
+                        ) : walletCopied ? (
                           <span className="text-[#00e676] bg-[#00e676]/10 px-2 py-0.5 rounded font-black text-[8.5px] uppercase tracking-wider">
                             {language === "bn" ? "কপি হয়েছে!" : "Copied!"}
                           </span>
@@ -2481,11 +2492,19 @@ export default function App() {
                       </div>
                       
                       {selectedNetwork === "bKash (বিকাশ)" ? (
-                        <div 
-                          onClick={handleCopyWalletAddress}
-                          className="w-full bg-slate-950/90 border border-pink-500/20 hover:border-pink-500/50 rounded-xl py-2 px-3 text-[11px] text-pink-400 font-mono font-extrabold select-all cursor-pointer leading-relaxed text-center hover:scale-[1.01] transition shadow-[0_0_10px_rgba(233,30,99,0.03)]"
-                        >
-                          {getSelectedWalletAddress() || "01767093032"}
+                        <div className="space-y-1.5">
+                          <a 
+                            href={telegramLink || "https://t.me/qtx8881"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full bg-gradient-to-r from-pink-950/70 via-pink-900/50 to-slate-950 border border-pink-500/40 hover:border-pink-400 rounded-xl py-2.5 px-4 text-xs text-pink-200 font-bold flex items-center justify-center gap-2 cursor-pointer leading-relaxed text-center hover:scale-[1.01] transition shadow-[0_0_15px_rgba(233,30,99,0.15)] group"
+                          >
+                            <Send className="w-4 h-4 text-pink-400 group-hover:scale-110 transition-transform" />
+                            <span>{walletLTC || "ইনবক্সে যোগাযোগ করুন"}</span>
+                            <span className="text-[10px] bg-pink-500/30 text-white px-2 py-0.5 rounded-full font-medium ml-1">
+                              টেলিগ্রাম ইনবক্স
+                            </span>
+                          </a>
                         </div>
                       ) : (
                         <div 
@@ -2497,7 +2516,7 @@ export default function App() {
                       )}
                       <p className="text-[9.5px] text-slate-400 mt-1 font-sans leading-relaxed text-center bg-transparent">
                         {selectedNetwork === "bKash (বিকাশ)" 
-                          ? (bkashInstruction || "* এই বিকাশ পার্সোনাল নাম্বারে ২৫০০ টাকা Send Money করুন এবং নিচে প্রেরক নম্বর ও TrxID দিন।")
+                          ? (bkashInstruction || "* পেমেন্ট নম্বর পেতে ইনবক্সে যোগাযোগ করুন এবং ট্রানজেকশন সম্পন্ন করে নিচে TrxID দিন।")
                           : (cryptoInstruction || "* Send exactly the payment amount to this receiver wallet.")}
                       </p>
                     </div>
