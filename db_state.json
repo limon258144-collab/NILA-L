@@ -1,12 +1,14 @@
 {
   "registeredUsers": {
     "limon2581444@gmail.com": "limonAbc123",
-    "000@gmail.com": "00000",
-    "00l@gmail.com": "00000",
-    "ll@gmail.com": "00000"
+    "000@gmail.com": "PROTECTED",
+    "00l@gmail.com": "PROTECTED",
+    "ll@gmail.com": "PROTECTED",
+    "rahman.trader@gmail.com": "mypassword123"
   },
   "activeSessions": {
-    "limon2581444@gmail.com": 1792942496709
+    "limon2581444@gmail.com": 1793325680523,
+    "rahman.trader@gmail.com": 1793325707131
   },
   "proUsers": [
     {
@@ -18,9 +20,33 @@
       "username": "ll@gmail.com",
       "expiresAt": 1786228581135,
       "verifiedAt": 1783636581135
+    },
+    {
+      "username": "rahman.trader@gmail.com",
+      "expiresAt": 1795917737302,
+      "verifiedAt": 1793325737302
     }
   ],
   "submittedPayments": [
+    {
+      "id": "pay_1793325718230_9865",
+      "userId": "UID-FB-5243A054",
+      "username": "rahman.trader@gmail.com",
+      "userEmail": "rahman.trader@gmail.com",
+      "userName": "Rahman Trader",
+      "paymentMethod": "bKash",
+      "network": "bKash (বিকাশ)",
+      "amount": 20,
+      "transactionId": "BKASH99281",
+      "senderNumber": "01712345678",
+      "timestamp": 1793325718230,
+      "status": "APPROVED",
+      "reviewedAt": 1793325737302,
+      "reviewedBy": "limon2581444@gmail.com",
+      "approvedAt": 1793325737302,
+      "approvedBy": "limon2581444@gmail.com",
+      "notes": "Verified on bKash statement"
+    },
     {
       "id": "pay_1783636083868_413",
       "username": "00l@gmail.com",
@@ -94,7 +120,7 @@
     "nila_custom_usdt_v1": "TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x",
     "nila_custom_trx_v1": "TX2iZJ9Z8p9M6k9y9n9t9Y9R9C9v9x",
     "nila_custom_ltc_v1": "ইনবক্সে যোগাযোগ করুন",
-    "nila_custom_bkash_inst_v1": "* পেমেন্ট নম্বর পেতে ইনবক্সে যোগাযোগ করুন এবং লেনদেন সম্পন্ন করুন।",
+    "nila_custom_bkash_inst_v1": "* এই বিকাশ পার্সোনাল নাম্বারে সমপরিমাণ টাকা Send Money করুন।",
     "nila_custom_crypto_inst_v1": "* Send exactly the payment amount to this receiver wallet.",
     "nila_sessions_revoked_before_v1": "1792563600000"
   },
@@ -103,12 +129,38 @@
   "registrationTimes": {
     "000@gmail.com": 1783423021169,
     "00l@gmail.com": 1783635623834,
-    "ll@gmail.com": 1783636416528
+    "ll@gmail.com": 1783636416528,
+    "rahman.trader@gmail.com": 1793325707131
   },
   "disabledUsers": [
     "limon258144@gmail.com"
   ],
   "activityLogs": [
+    {
+      "id": "act_1793325737302_711",
+      "adminEmail": "limon2581444@gmail.com",
+      "adminUid": "UID-FB-7F2FB8E6",
+      "action": "Approved payment pay_1793325718230_9865 (TrxID: BKASH99281) - 30 days VIP activated for rahman.trader@gmail.com",
+      "targetUser": "rahman.trader@gmail.com",
+      "timestamp": 1793325737302,
+      "details": "Verified on bKash statement"
+    },
+    {
+      "id": "act_1793325718230_808",
+      "adminEmail": "user",
+      "adminUid": "UID-FB-5243A054",
+      "action": "Payment request submitted: pay_1793325718230_9865 (BKASH99281) by rahman.trader@gmail.com for $20",
+      "targetUser": "rahman.trader@gmail.com",
+      "timestamp": 1793325718230
+    },
+    {
+      "id": "act_1793325707131_497",
+      "adminEmail": "system",
+      "adminUid": "SYSTEM",
+      "action": "New user registration: rahman.trader@gmail.com (Rahman Trader)",
+      "targetUser": "rahman.trader@gmail.com",
+      "timestamp": 1793325707131
+    },
     {
       "id": "act_1792562572277_13",
       "adminEmail": "limon2581444@gmail.com",
@@ -150,9 +202,9 @@
       "role": "SUPER_ADMIN",
       "status": "active",
       "proStatus": "active",
-      "proExpiresAt": 1824478506981,
+      "proExpiresAt": 1824861753756,
       "createdAt": 1790458416573,
-      "lastLogin": 1792942496709,
+      "lastLogin": 1793325680523,
       "notes": "Master Super Admin"
     },
     "000@gmail.com": {
@@ -172,7 +224,7 @@
       "name": "00l",
       "role": "USER",
       "status": "active",
-      "proStatus": "inactive",
+      "proStatus": "expired",
       "proExpiresAt": 1786228131609,
       "createdAt": 1783635623834,
       "lastLogin": 1783636158154,
@@ -184,10 +236,23 @@
       "name": "Ll",
       "role": "USER",
       "status": "active",
-      "proStatus": "inactive",
+      "proStatus": "expired",
       "proExpiresAt": 1786228581135,
       "createdAt": 1783636416528,
       "lastLogin": 1783636418030,
+      "notes": ""
+    },
+    "rahman.trader@gmail.com": {
+      "uid": "UID-FB-5243A054",
+      "email": "rahman.trader@gmail.com",
+      "name": "Rahman Trader",
+      "role": "USER",
+      "status": "active",
+      "proStatus": "active",
+      "proExpiresAt": 1795917737302,
+      "createdAt": 1793325707131,
+      "lastLogin": 1793325707131,
+      "lastHeartbeat": 1793325707131,
       "notes": ""
     }
   },
@@ -198,7 +263,20 @@
       "role": "SUPER_ADMIN",
       "status": "active",
       "createdAt": 1783360000000,
-      "lastLogin": 1792942506981
+      "lastLogin": 1793325753756
     }
-  }
+  },
+  "activeHeartbeats": {
+    "testuser1@gmail.com": {
+      "lastHeartbeat": 1793325695117,
+      "sessionId": "sess_1793325695117",
+      "ip": "127.0.0.1"
+    },
+    "rahman.trader@gmail.com": {
+      "lastHeartbeat": 0,
+      "sessionId": "reg_1793325707131"
+    }
+  },
+  "trialRecords": {},
+  "signalAttemptsToday": {}
 }

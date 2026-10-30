@@ -16,8 +16,15 @@ import {
   RefreshCw,
   LogOut
 } from "lucide-react";
-import { syncWithServer, executeAdminAction } from "../sync";
-import { UserAccount, PaymentRequestItem, ActivityLogItem, AdminRoleItem } from "../types";
+import { 
+  syncWithServer, 
+  executeAdminAction,
+  fetchAdminStats,
+  fetchAdminUsers,
+  fetchAdminRequests,
+  reviewPaymentRequest
+} from "../sync";
+import { UserAccount, PaymentRequestItem, ActivityLogItem, AdminRoleItem, AdminDashboardStats } from "../types";
 import AdminStatsOverview from "./admin/AdminStatsOverview";
 import AdminPaymentRequests from "./admin/AdminPaymentRequests";
 import AdminUsersManagement from "./admin/AdminUsersManagement";
@@ -35,9 +42,14 @@ interface AdminPanelProps {
 export default function AdminPanel({ language, onBackToApp, currentUser, onLogout }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "payments" | "users" | "admins" | "analytics" | "activity" | "support" | "settings">("overview");
   const [userFilter, setUserFilter] = useState<string>("ALL");
-  const [paymentFilter, setPaymentFilter] = useState<"all" | "pending" | "approved" | "disabled">("all");
+  const [paymentFilter, setPaymentFilter] = useState<"all" | "pending" | "under_review" | "approved" | "rejected" | "disabled">("all");
   const [isSyncing, setIsSyncing] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // Server stats state
+  const [adminStats, setAdminStats] = useState<AdminDashboardStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState<string | null>(null);
 
   // Database state
   const [userAccounts, setUserAccounts] = useState<UserAccount[]>([]);
@@ -108,100 +120,103 @@ export default function AdminPanel({ language, onBackToApp, currentUser, onLogou
     }
   };
 
+  const fetchServerData = async () => {
+    setStatsLoading(true);
+    try {
+      const [statsRes, usersRes, reqsRes] = await Promise.all([
+        fetchAdminStats(adminEmail),
+        fetchAdminUsers(adminEmail, { limit: 100 }),
+        fetchAdminRequests(adminEmail, { limit: 100 }),
+      ]);
+
+      if (statsRes.success && statsRes.stats) {
+        setAdminStats(statsRes.stats);
+        setStatsError(null);
+      } else if (statsRes.error) {
+        setStatsError(statsRes.error);
+      }
+
+      if (usersRes.success && usersRes.users) {
+        setUserAccounts(usersRes.users);
+      }
+
+      if (reqsRes.success && reqsRes.requests) {
+        setSubmittedPayments(reqsRes.requests);
+      }
+    } catch (err: any) {
+      setStatsError(err.message || "Failed to load server data");
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadLocalState();
+    fetchServerData();
     syncWithServer();
-    const interval = setInterval(() => {
-      syncWithServer().then(() => loadLocalState());
-    }, 4500);
 
-    const handleUpdate = () => loadLocalState();
+    // Auto-refresh stats every 5 seconds
+    const interval = setInterval(() => {
+      fetchServerData();
+      syncWithServer().then(() => loadLocalState());
+    }, 5000);
+
+    const handleUpdate = () => {
+      loadLocalState();
+      fetchServerData();
+    };
+
     window.addEventListener("nila_settings_updated", handleUpdate);
     return () => {
       clearInterval(interval);
       window.removeEventListener("nila_settings_updated", handleUpdate);
     };
-  }, []);
-
-  // Compute live statistics for overview
-  const now = Date.now();
-  const startOfToday = new Date().setHours(0, 0, 0, 0);
-  const oneWeekAgo = now - 7 * 86400000;
-  const oneMonthAgo = now - 30 * 86400000;
-
-  const totalUsers = userAccounts.length;
-  const activeUsers = userAccounts.filter((u) => u.status === "active").length;
-  const inactiveUsers = userAccounts.filter((u) => u.status === "inactive").length;
-  const disabledUsers = userAccounts.filter((u) => u.status === "disabled").length;
-  const proUsers = userAccounts.filter((u) => u.proStatus === "active").length;
-  const nonProUsers = Math.max(0, totalUsers - proUsers);
-
-  const pendingRequests = submittedPayments.filter((p) => p.status === "pending" || !p.status).length;
-  const approvedPayments = submittedPayments.filter((p) => p.status === "approved").length;
-  const disabledPayments = submittedPayments.filter((p) => p.status === "disabled" || p.status === "rejected").length;
-  const totalPaymentRequests = submittedPayments.length;
-
-  const newToday = userAccounts.filter((u) => u.createdAt && u.createdAt >= startOfToday).length;
-  const newThisWeek = userAccounts.filter((u) => u.createdAt && u.createdAt >= oneWeekAgo).length;
-  const newThisMonth = userAccounts.filter((u) => u.createdAt && u.createdAt >= oneMonthAgo).length;
-
-  const requestsToday = submittedPayments.filter((p) => p.timestamp && p.timestamp >= startOfToday).length;
-  const approvedToday = submittedPayments.filter((p) => p.status === "approved" && (p.approvedAt || p.timestamp) >= startOfToday).length;
-  const pendingToday = submittedPayments.filter((p) => (p.status === "pending" || !p.status) && p.timestamp >= startOfToday).length;
-
-  const overviewStats = {
-    totalUsers,
-    pendingRequests,
-    activeUsers,
-    inactiveUsers,
-    disabledUsers,
-    proUsers,
-    nonProUsers,
-    approvedPayments,
-    disabledPayments,
-    totalPaymentRequests,
-    newToday,
-    newThisWeek,
-    newThisMonth,
-    requestsToday,
-    approvedToday,
-    pendingToday,
-  };
+  }, [adminEmail]);
 
   // Card click filter routing
-  const handleFilterCardClick = (target: "all-users" | "pending-payments" | "active-users" | "inactive-users" | "disabled-users" | "pro-users" | "approved-payments" | "all-payments") => {
+  const handleFilterCardClick = (target: string) => {
     switch (target) {
       case "all-users":
         setUserFilter("ALL");
+        setActiveTab("users");
+        break;
+      case "online-users":
+        setUserFilter("ONLINE");
+        setActiveTab("users");
+        break;
+      case "offline-users":
+        setUserFilter("OFFLINE");
         setActiveTab("users");
         break;
       case "pending-payments":
         setPaymentFilter("pending");
         setActiveTab("payments");
         break;
-      case "active-users":
-        setUserFilter("ACTIVE");
-        setActiveTab("users");
-        break;
-      case "inactive-users":
-        setUserFilter("INACTIVE");
-        setActiveTab("users");
-        break;
-      case "disabled-users":
-        setUserFilter("DISABLED");
-        setActiveTab("users");
-        break;
-      case "pro-users":
-        setUserFilter("PRO ACTIVE");
-        setActiveTab("users");
+      case "under-review-payments":
+        setPaymentFilter("under_review");
+        setActiveTab("payments");
         break;
       case "approved-payments":
         setPaymentFilter("approved");
         setActiveTab("payments");
         break;
-      case "all-payments":
-        setPaymentFilter("all");
+      case "rejected-payments":
+        setPaymentFilter("rejected");
         setActiveTab("payments");
+        break;
+      case "active-vip":
+        setUserFilter("PRO ACTIVE");
+        setActiveTab("users");
+        break;
+      case "expired-vip":
+        setUserFilter("EXPIRED VIP");
+        setActiveTab("users");
+        break;
+      case "signals-today":
+        setActiveTab("overview");
+        break;
+      default:
+        setActiveTab("overview");
         break;
     }
   };
@@ -209,10 +224,37 @@ export default function AdminPanel({ language, onBackToApp, currentUser, onLogou
   // Action Handlers
   const handleApprovePayment = async (p: PaymentRequestItem) => {
     setIsSyncing(true);
-    const res = await executeAdminAction(adminEmail, "APPROVE_PAYMENT", p.username, { paymentId: p.id });
+    const res = await reviewPaymentRequest(adminEmail, p.id, "APPROVE");
     setIsSyncing(false);
     if (res.success) {
-      showToast(`Payment approved! PRO activated for ${p.username}`);
+      showToast(`Payment approved! VIP activated for ${p.username}`);
+      fetchServerData();
+      loadLocalState();
+    } else {
+      showToast(`Failed: ${res.error}`);
+    }
+  };
+
+  const handleUnderReviewPayment = async (p: PaymentRequestItem) => {
+    setIsSyncing(true);
+    const res = await reviewPaymentRequest(adminEmail, p.id, "UNDER_REVIEW");
+    setIsSyncing(false);
+    if (res.success) {
+      showToast(`Request marked as Under Review.`);
+      fetchServerData();
+      loadLocalState();
+    } else {
+      showToast(`Failed: ${res.error}`);
+    }
+  };
+
+  const handleRejectPayment = async (p: PaymentRequestItem) => {
+    setIsSyncing(true);
+    const res = await reviewPaymentRequest(adminEmail, p.id, "REJECT");
+    setIsSyncing(false);
+    if (res.success) {
+      showToast(`Payment rejected for ${p.username}`);
+      fetchServerData();
       loadLocalState();
     } else {
       showToast(`Failed: ${res.error}`);
@@ -220,15 +262,7 @@ export default function AdminPanel({ language, onBackToApp, currentUser, onLogou
   };
 
   const handleDisablePayment = async (p: PaymentRequestItem) => {
-    setIsSyncing(true);
-    const res = await executeAdminAction(adminEmail, "DISABLE_PAYMENT", p.username, { paymentId: p.id });
-    setIsSyncing(false);
-    if (res.success) {
-      showToast(`Payment disabled and account blocked for ${p.username}`);
-      loadLocalState();
-    } else {
-      showToast(`Failed: ${res.error}`);
-    }
+    return handleRejectPayment(p);
   };
 
   const handleActivateUser = async (email: string) => {
@@ -465,9 +499,9 @@ export default function AdminPanel({ language, onBackToApp, currentUser, onLogou
         >
           <CreditCard className="w-3.5 h-3.5" />
           <span>Payments</span>
-          {pendingRequests > 0 && (
+          {(adminStats?.totalPendingPayments ?? submittedPayments.filter(p => p.status === "PENDING" || p.status === "pending").length) > 0 && (
             <span className="w-4 h-4 rounded-full bg-amber-500 text-black text-[9px] font-black flex items-center justify-center animate-pulse">
-              {pendingRequests}
+              {adminStats?.totalPendingPayments ?? submittedPayments.filter(p => p.status === "PENDING" || p.status === "pending").length}
             </span>
           )}
         </button>
@@ -554,10 +588,13 @@ export default function AdminPanel({ language, onBackToApp, currentUser, onLogou
       {/* Tab Panels */}
       {activeTab === "overview" && (
         <AdminStatsOverview
-          stats={overviewStats}
+          stats={adminStats}
           language={language}
           onFilterCardClick={handleFilterCardClick}
           isSyncing={isSyncing}
+          isLoading={statsLoading}
+          errorMessage={statsError}
+          onRefresh={fetchServerData}
         />
       )}
 
@@ -569,6 +606,8 @@ export default function AdminPanel({ language, onBackToApp, currentUser, onLogou
           onFilterChange={setPaymentFilter}
           onApprove={handleApprovePayment}
           onDisable={handleDisablePayment}
+          onUnderReview={handleUnderReviewPayment}
+          onReject={handleRejectPayment}
           isActionLoading={isSyncing}
         />
       )}

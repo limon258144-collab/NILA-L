@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { syncWithServer } from "../sync";
+import { syncWithServer, registerUser, loginUser } from "../sync";
 import { 
   Lock, 
   User, 
@@ -116,7 +116,7 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
     return false;
   };
 
-  const handleAccountSelect = (email: string) => {
+  const handleAccountSelect = async (email: string) => {
     setErrorMsg(null);
     const lower = email.toLowerCase().trim();
     if (lower === "limon2581444@gmail.com" || lower === "limon2581444@gmail") {
@@ -143,15 +143,35 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
     setIsSigningIn(true);
     setSelectedEmail(email);
     
-    // Simulate natural secure Google callback delay
+    // Register or login on backend
+    const regRes = await registerUser({ email: lower, password: "google-oauth", name: lower.split("@")[0] });
+    if (!regRes.success && regRes.error !== "An account with this email already exists") {
+      // If already registered, attempt login
+      const logRes = await loginUser({ email: lower, password: "google-oauth" });
+      if (!logRes.success && logRes.error?.includes("disabled")) {
+        setIsSigningIn(false);
+        setErrorMsg(logRes.error);
+        return;
+      }
+    }
+
+    try {
+      const users = JSON.parse(localStorage.getItem("nila_registered_users_v2") || "{}");
+      if (!users[lower]) users[lower] = "google-oauth";
+      localStorage.setItem("nila_registered_users_v2", JSON.stringify(users));
+      const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
+      if (!times[lower]) times[lower] = Date.now();
+      localStorage.setItem("nila_registration_times_v1", JSON.stringify(times));
+    } catch {}
+
     setTimeout(() => {
       setIsSigningIn(false);
       setShowChooser(false);
       onLoginSuccess(email);
-    }, 1200);
+    }, 600);
   };
 
-  const handleCustomSubmit = (e: React.FormEvent) => {
+  const handleCustomSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     
@@ -202,35 +222,35 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
     setIsSigningIn(true);
     setSelectedEmail(cleanMail);
     
+    // Register or login on backend
+    const regRes = await registerUser({ email: cleanMail, password: "google-oauth", name: cleanMail.split("@")[0] });
+    if (!regRes.success && regRes.error !== "An account with this email already exists") {
+      const logRes = await loginUser({ email: cleanMail, password: "google-oauth" });
+      if (!logRes.success && logRes.error?.includes("disabled")) {
+        setIsSigningIn(false);
+        setErrorMsg(logRes.error);
+        return;
+      }
+    }
+
+    try {
+      const users = JSON.parse(localStorage.getItem("nila_registered_users_v2") || "{}");
+      if (!users[cleanMail]) users[cleanMail] = "google-oauth";
+      localStorage.setItem("nila_registered_users_v2", JSON.stringify(users));
+      const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
+      if (!times[cleanMail]) times[cleanMail] = Date.now();
+      localStorage.setItem("nila_registration_times_v1", JSON.stringify(times));
+    } catch {}
+
     setTimeout(() => {
       setIsSigningIn(false);
       setShowChooser(false);
-      // Store in users locally for traceability
-      try {
-        const users = JSON.parse(localStorage.getItem("nila_registered_users_v2") || "{}");
-        const isNew = !users[cleanMail];
-        users[cleanMail] = "google-oauth";
-        localStorage.setItem("nila_registered_users_v2", JSON.stringify(users));
-        if (isNew) {
-          const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
-          times[cleanMail] = Date.now();
-          localStorage.setItem("nila_registration_times_v1", JSON.stringify(times));
-        }
-        
-        // Remove from deletedUsers list if present
-        const deletedUsers: string[] = JSON.parse(localStorage.getItem("nila_deleted_users_v1") || "[]");
-        const filteredDeleted = deletedUsers.filter((u: string) => u.toLowerCase() !== cleanMail.toLowerCase());
-        localStorage.setItem("nila_deleted_users_v1", JSON.stringify(filteredDeleted));
-        syncWithServer();
-      } catch (err) {
-        console.error(err);
-      }
       onLoginSuccess(cleanMail);
-    }, 1500);
+    }, 600);
   };
 
   // Direct login submit handler
-  const handleDirectLogin = (e: React.FormEvent) => {
+  const handleDirectLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     let email = loginEmail.trim().toLowerCase();
@@ -258,67 +278,30 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
       return;
     }
 
-    // Load actual users
-    let regs: Record<string, string> = {
-      "limon2581444@gmail.com": "limonAbc123"
-    };
-
-    try {
-      const stored = localStorage.getItem("nila_registered_users_v2");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (typeof parsed === "object" && parsed !== null) {
-          regs = { ...regs, ...parsed };
-        }
-      }
-    } catch (err) {
-      console.error(err);
-    }
-
-    // ALWAYS enforce Master Admin credentials strictly and revoke legacy admin passwords
-    regs["limon2581444@gmail.com"] = "limonAbc123";
-    delete regs["limon258144@gmail.com"];
-    delete regs["admin@gmail.com"];
-    delete regs["admin"];
-
-    if (!regs[email]) {
-      setErrorMsg(
-        language === "bn" 
-          ? "দুঃখিত! এই ইমেইলে কোনো অ্যাকাউন্ট নিবন্ধিত নেই। প্রথমে 'রেজিস্ট্রেশন' করুন।" 
-          : "Incorrect email! No registration found. Please Register first."
-      );
-      return;
-    }
-
-    if (checkIsAccountDisabled(email)) {
-      setErrorMsg(
-        language === "bn"
-          ? "আপনার অ্যাকাউন্টটি স্থগিত (Disabled) করা হয়েছে। দয়া করে অ্যাডমিনের সাথে যোগাযোগ করুন।"
-          : "Your account has been disabled. Please contact admin."
-      );
-      return;
-    }
-
-    if (regs[email] !== password) {
-      setErrorMsg(
-        language === "bn" 
-          ? "ভুল পাসওয়ার্ড! দয়া করে সঠিক পাসওয়ার্ড দিন।" 
-          : "Incorrect password! Please write correct security password."
-      );
-      return;
-    }
-
     setIsSigningIn(true);
     setSelectedEmail(email);
+
+    const loginRes = await loginUser({ email, password });
+    if (!loginRes.success) {
+      setIsSigningIn(false);
+      setErrorMsg(loginRes.error || (language === "bn" ? "ভুল ইমেইল বা পাসওয়ার্ড!" : "Incorrect email or password!"));
+      return;
+    }
+
+    try {
+      const users = JSON.parse(localStorage.getItem("nila_registered_users_v2") || "{}");
+      users[email] = password;
+      localStorage.setItem("nila_registered_users_v2", JSON.stringify(users));
+    } catch {}
 
     setTimeout(() => {
       setIsSigningIn(false);
       onLoginSuccess(email);
-    }, 1205);
+    }, 500);
   };
 
   // Direct register/signup submit handler
-  const handleDirectRegister = (e: React.FormEvent) => {
+  const handleDirectRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     const email = regEmail.trim().toLowerCase();
@@ -361,53 +344,29 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
       return;
     }
 
-    // Load actual users
-    let regs: Record<string, string> = {};
+    setIsSigningIn(true);
+    setSelectedEmail(email);
 
-    try {
-      const stored = localStorage.getItem("nila_registered_users_v2");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (typeof parsed === "object" && parsed !== null) {
-          regs = { ...regs, ...parsed };
-        }
-      }
-    } catch (err) {
-      console.error(err);
-    }
-
-    if (regs[email]) {
-      setErrorMsg(
-        language === "bn" 
-          ? "এই জিমেইল ইতিমধ্যে নিবন্ধিত রয়েছে। দয়া করে লগইন করুন।" 
-          : "This Gmail is already registered. Please go to Login tab."
-      );
+    const regRes = await registerUser({ email, password, name: regName.trim() || undefined });
+    if (!regRes.success) {
+      setIsSigningIn(false);
+      setErrorMsg(regRes.error || (language === "bn" ? "রেজিস্ট্রেশন ব্যর্থ হয়েছে!" : "Registration failed!"));
       return;
     }
 
-    // Write back
-    regs[email] = password;
     try {
-      localStorage.setItem("nila_registered_users_v2", JSON.stringify(regs));
+      const users = JSON.parse(localStorage.getItem("nila_registered_users_v2") || "{}");
+      users[email] = password;
+      localStorage.setItem("nila_registered_users_v2", JSON.stringify(users));
       const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
       times[email] = Date.now();
       localStorage.setItem("nila_registration_times_v1", JSON.stringify(times));
-
-      const deletedUsers: string[] = JSON.parse(localStorage.getItem("nila_deleted_users_v1") || "[]");
-      const filteredDeleted = deletedUsers.filter((u: string) => u.toLowerCase() !== email.toLowerCase());
-      localStorage.setItem("nila_deleted_users_v1", JSON.stringify(filteredDeleted));
-      syncWithServer();
-    } catch (err) {
-      console.error(err);
-    }
-
-    setIsSigningIn(true);
-    setSelectedEmail(email);
+    } catch {}
 
     setTimeout(() => {
       setIsSigningIn(false);
       onLoginSuccess(email);
-    }, 1500);
+    }, 600);
   };
 
   const openTelegramGroup = () => {

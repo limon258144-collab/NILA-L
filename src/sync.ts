@@ -303,3 +303,224 @@ export async function executeAdminAction(
   }
 }
 
+// Admin API client helpers
+export async function fetchAdminStats(adminEmail: string): Promise<{ success: boolean; stats?: any; error?: string }> {
+  try {
+    const res = await fetch(`/api/admin/stats?adminEmail=${encodeURIComponent(adminEmail)}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: err.error || `HTTP ${res.status}: Failed to fetch stats` };
+    }
+    const data = await res.json();
+    return { success: true, stats: data.stats };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Network error loading stats" };
+  }
+}
+
+export async function fetchAdminUsers(
+  adminEmail: string,
+  params: { page?: number; limit?: number; search?: string; filter?: string } = {}
+): Promise<{ success: boolean; users?: any[]; total?: number; page?: number; totalPages?: number; error?: string }> {
+  try {
+    const query = new URLSearchParams({
+      adminEmail,
+      page: (params.page || 1).toString(),
+      limit: (params.limit || 20).toString(),
+      search: params.search || "",
+      filter: params.filter || "ALL",
+    });
+    const res = await fetch(`/api/admin/users?${query.toString()}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: err.error || `HTTP ${res.status}: Failed to fetch users` };
+    }
+    const data = await res.json();
+    return {
+      success: true,
+      users: data.users || [],
+      total: data.total || 0,
+      page: data.page || 1,
+      totalPages: data.totalPages || 1,
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Network error loading users" };
+  }
+}
+
+export async function fetchAdminRequests(
+  adminEmail: string,
+  params: { page?: number; limit?: number; search?: string; filter?: string } = {}
+): Promise<{ success: boolean; requests?: any[]; total?: number; page?: number; totalPages?: number; error?: string }> {
+  try {
+    const query = new URLSearchParams({
+      adminEmail,
+      page: (params.page || 1).toString(),
+      limit: (params.limit || 20).toString(),
+      search: params.search || "",
+      filter: params.filter || "ALL",
+    });
+    const res = await fetch(`/api/admin/requests?${query.toString()}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: err.error || `HTTP ${res.status}: Failed to fetch requests` };
+    }
+    const data = await res.json();
+    return {
+      success: true,
+      requests: data.requests || [],
+      total: data.total || 0,
+      page: data.page || 1,
+      totalPages: data.totalPages || 1,
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Network error loading requests" };
+  }
+}
+
+export async function reviewPaymentRequest(
+  adminEmail: string,
+  requestId: string,
+  action: "APPROVE" | "REJECT" | "UNDER_REVIEW",
+  notes?: string
+): Promise<{ success: boolean; request?: any; error?: string }> {
+  try {
+    const res = await fetch(`/api/admin/requests/${encodeURIComponent(requestId)}/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ adminEmail, action, notes }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: err.error || `Failed to ${action} request` };
+    }
+    const data = await res.json();
+    // Trigger sync to refresh local states
+    syncWithServer();
+    return { success: true, request: data.request };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Network error reviewing request" };
+  }
+}
+
+// User Trial API
+export async function fetchTrialStatus(email: string): Promise<{ success: boolean; trialStatus?: any; error?: string }> {
+  try {
+    const res = await fetch(`/api/trial/status?email=${encodeURIComponent(email)}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: err.error || "Failed to fetch trial status" };
+    }
+    const data = await res.json();
+    return { success: true, trialStatus: data.trialStatus };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Network error fetching trial status" };
+  }
+}
+
+// Heartbeat & Presence API
+export async function sendUserHeartbeat(email: string, sessionId?: string): Promise<{ online: boolean }> {
+  try {
+    const res = await fetch("/api/user/heartbeat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, sessionId }),
+    });
+    if (!res.ok) return { online: false };
+    const data = await res.json();
+    return { online: !!data.online };
+  } catch {
+    return { online: false };
+  }
+}
+
+export function sendUserLeave(email: string) {
+  try {
+    if (navigator.sendBeacon) {
+      const blob = new Blob([JSON.stringify({ email })], { type: "application/json" });
+      navigator.sendBeacon("/api/user/leave", blob);
+    } else {
+      fetch("/api/user/leave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+        keepalive: true,
+      }).catch(() => {});
+    }
+  } catch {}
+}
+
+// User Payment Request Submission
+export async function submitPaymentRequest(payload: {
+  email: string;
+  paymentMethod: string;
+  network?: string;
+  amount: number;
+  transactionId: string;
+  senderNumber: string;
+}): Promise<{ success: boolean; request?: any; error?: string }> {
+  try {
+    const res = await fetch("/api/payment/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: err.error || "Failed to submit payment request" };
+    }
+    const data = await res.json();
+    syncWithServer();
+    return { success: true, request: data.request };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Network error submitting payment" };
+  }
+}
+
+// Auth APIs
+export async function registerUser(payload: {
+  email: string;
+  password: string;
+  name?: string;
+}): Promise<{ success: boolean; user?: any; trialStatus?: any; error?: string }> {
+  try {
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: err.error || "Registration failed" };
+    }
+    const data = await res.json();
+    syncWithServer();
+    return { success: true, user: data.user, trialStatus: data.trialStatus };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Network error registering" };
+  }
+}
+
+export async function loginUser(payload: {
+  email: string;
+  password: string;
+  sessionId?: string;
+}): Promise<{ success: boolean; user?: any; trialStatus?: any; error?: string }> {
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { success: false, error: err.error || "Login failed" };
+    }
+    const data = await res.json();
+    syncWithServer();
+    return { success: true, user: data.user, trialStatus: data.trialStatus };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Network error logging in" };
+  }
+}
+

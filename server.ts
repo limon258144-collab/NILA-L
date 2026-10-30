@@ -16,6 +16,7 @@ const DB_PATH = path.join(process.cwd(), "db_state.json");
 interface DbState {
   registeredUsers: Record<string, string>;
   activeSessions: Record<string, number>;
+  activeHeartbeats?: Record<string, { lastHeartbeat: number; sessionId?: string; ip?: string }>;
   proUsers: Array<{ username: string; expiresAt: number; verifiedAt: number }>;
   submittedPayments: Array<{
     id: string;
@@ -28,12 +29,15 @@ interface DbState {
     transactionId: string;
     amount: number;
     network?: string;
-    status: "pending" | "approved" | "rejected" | "disabled";
+    status: "PENDING" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "pending" | "approved" | "rejected" | "disabled";
     timestamp: number;
+    reviewedAt?: number;
+    reviewedBy?: string;
     approvedAt?: number;
     approvedBy?: string;
     disabledAt?: number;
     disabledBy?: string;
+    notes?: string;
   }>;
   supportChats: Record<string, any>;
   analysisLimits: Record<string, any>;
@@ -48,10 +52,11 @@ interface DbState {
     name: string;
     role: "SUPER_ADMIN" | "ADMIN" | "USER";
     status: "active" | "inactive" | "disabled";
-    proStatus: "active" | "inactive";
+    proStatus: "active" | "inactive" | "expired";
     proExpiresAt?: number;
     createdAt: number;
     lastLogin: number;
+    lastHeartbeat?: number;
     notes?: string;
   }>;
   adminRoles?: Record<string, {
@@ -71,6 +76,43 @@ interface DbState {
     timestamp: number;
     details?: string;
   }>;
+  trialRecords?: Record<string, {
+    trialStartDate: number;
+    trialEndDate: number;
+    dailyAttempts: Record<string, number>;
+    totalAttempts: number;
+    history?: Array<{ timestamp: number; dateStr: string; idempotencyKey?: string }>;
+  }>;
+  signalAttemptsToday?: Record<string, number>;
+}
+
+// Business timezone: Asia/Dhaka (+06:00)
+const BUSINESS_TIMEZONE = "Asia/Dhaka";
+const PRESENCE_WINDOW_MS = 60000; // 60 seconds
+const MAX_TRIAL_DAILY_ATTEMPTS = 5;
+const TRIAL_DURATION_DAYS = 5;
+
+function getDhakaDateStr(dateOrTs: Date | number = new Date()): string {
+  const d = typeof dateOrTs === "number" ? new Date(dateOrTs) : dateOrTs;
+  return new Intl.DateTimeFormat("en-CA", { timeZone: BUSINESS_TIMEZONE }).format(d);
+}
+
+function getDhakaDayStart(dateOrTs: Date | number = new Date()): number {
+  const dateStr = getDhakaDateStr(dateOrTs);
+  return new Date(`${dateStr}T00:00:00+06:00`).getTime();
+}
+
+function getDhakaDayEnd(dateOrTs: Date | number = new Date()): number {
+  const dateStr = getDhakaDateStr(dateOrTs);
+  return new Date(`${dateStr}T23:59:59.999+06:00`).getTime();
+}
+
+// In-memory Promise lock queue for concurrency-safe database mutations
+let dbLock = Promise.resolve();
+function runWithDbLock<T>(fn: () => Promise<T> | T): Promise<T> {
+  const next = dbLock.then(() => fn());
+  dbLock = next.then(() => {}, () => {});
+  return next;
 }
 
 // Generate consistent deterministic UID for each user email
@@ -146,12 +188,14 @@ function ensureUserAccounts(db: DbState) {
 
     // Check pro status
     const proEntry = (db.proUsers || []).find(p => p && p.username && p.username.toLowerCase() === email);
-    const isPro = !!proEntry && (!proEntry.expiresAt || proEntry.expiresAt > Date.now()) && !isDisabled;
-    const proStatus = (isSuper || isPro) ? "active" : "inactive";
+    const hasPro = !!proEntry && (!proEntry.expiresAt || proEntry.expiresAt > Date.now()) && !isDisabled;
+    const isExpiredPro = !!proEntry && !!proEntry.expiresAt && proEntry.expiresAt <= Date.now();
+    const proStatus = (isSuper || hasPro) ? "active" : (isExpiredPro ? "expired" : "inactive");
     const proExpiresAt = isSuper ? (Date.now() + 365 * 86400000) : proEntry?.expiresAt;
 
     const createdAt = db.registrationTimes?.[email] || existing?.createdAt || (Date.now() - 7 * 86400000);
     const lastLogin = db.activeSessions?.[email] || existing?.lastLogin || createdAt;
+    const lastHeartbeat = db.activeHeartbeats?.[email]?.lastHeartbeat || existing?.lastHeartbeat;
 
     const baseName = email.includes("@") ? email.split("@")[0] : email;
     const name = existing?.name || (isSuper ? "Limon Ahmed (Super Admin)" : (baseName.charAt(0).toUpperCase() + baseName.slice(1)));
@@ -166,6 +210,7 @@ function ensureUserAccounts(db: DbState) {
       proExpiresAt,
       createdAt,
       lastLogin,
+      lastHeartbeat,
       notes: existing?.notes || (isSuper ? "Master Super Admin" : ""),
     };
   }
@@ -182,6 +227,9 @@ function readDb(): DbState {
         if (!db.disabledUsers) db.disabledUsers = [];
         if (!db.registrationTimes) db.registrationTimes = {};
         if (!db.activityLogs) db.activityLogs = [];
+        if (!db.activeHeartbeats) db.activeHeartbeats = {};
+        if (!db.trialRecords) db.trialRecords = {};
+        if (!db.signalAttemptsToday) db.signalAttemptsToday = {};
         if (Array.isArray(db.submittedPayments)) {
           db.submittedPayments = db.submittedPayments.filter((p: any) => {
             return p && p.id && p.id.length >= 8;
@@ -199,6 +247,7 @@ function readDb(): DbState {
       "limon2581444@gmail.com": "limonAbc123"
     },
     activeSessions: {},
+    activeHeartbeats: {},
     proUsers: [],
     submittedPayments: [],
     supportChats: {},
@@ -211,6 +260,8 @@ function readDb(): DbState {
     userAccounts: {},
     adminRoles: {},
     activityLogs: [],
+    trialRecords: {},
+    signalAttemptsToday: {},
   };
   ensureUserAccounts(defaultDb);
   return defaultDb;
@@ -219,10 +270,243 @@ function readDb(): DbState {
 function writeDb(state: DbState) {
   try {
     ensureUserAccounts(state);
-    fs.writeFileSync(DB_PATH, JSON.stringify(state, null, 2), "utf-8");
+    const tmp = `${DB_PATH}.tmp.${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    fs.writeFileSync(tmp, JSON.stringify(state, null, 2), "utf-8");
+    fs.renameSync(tmp, DB_PATH);
   } catch (err) {
     console.error("Error writing db_state.json:", err);
   }
+}
+
+// Presence evaluation helper
+function isUserOnline(db: DbState, email: string): boolean {
+  if (!email) return false;
+  const lower = email.toLowerCase().trim();
+  if ((db.disabledUsers || []).includes(lower)) return false;
+  if (db.userAccounts?.[lower]?.status === "disabled") return false;
+
+  // Check session revocation
+  const revokedBefore = parseInt(db.configs?.["nila_sessions_revoked_before_v1"] || "0", 10);
+  const userRevokedAt = parseInt(db.configs?.[`nila_user_revoked_${lower}`] || "0", 10);
+  const isMaster = lower === "limon2581444@gmail.com" || lower === "limon2581444@gmail";
+
+  const hb = db.activeHeartbeats?.[lower];
+  if (!hb || !hb.lastHeartbeat) return false;
+
+  if (!isMaster && revokedBefore > 0 && hb.lastHeartbeat <= revokedBefore) return false;
+  if (!isMaster && userRevokedAt > 0 && hb.lastHeartbeat <= userRevokedAt) return false;
+
+  return (Date.now() - hb.lastHeartbeat) <= PRESENCE_WINDOW_MS;
+}
+
+// Concurrency-safe Trial limit engine: 5 attempts per day for 5 days
+function evaluateTrial(
+  db: DbState,
+  rawEmail: string,
+  isConsuming: boolean = false,
+  idempotencyKey?: string
+) {
+  const email = (rawEmail || "").toLowerCase().trim();
+  const now = Date.now();
+  const todayStr = getDhakaDateStr(now);
+
+  if (!db.trialRecords) db.trialRecords = {};
+  if (!db.signalAttemptsToday) db.signalAttemptsToday = {};
+
+  // Check VIP entitlement
+  const isSuper = email === "limon2581444@gmail.com" || email === "limon2581444@gmail" || db.adminRoles?.[email]?.role === "SUPER_ADMIN";
+  const isAdmin = isSuper || db.adminRoles?.[email]?.role === "ADMIN";
+  const proEntry = (db.proUsers || []).find(p => p && p.username && p.username.toLowerCase() === email);
+  const isPro = !!proEntry && (!proEntry.expiresAt || proEntry.expiresAt > now) && !(db.disabledUsers || []).includes(email);
+  const isVip = isSuper || isAdmin || isPro;
+
+  if (isVip) {
+    if (isConsuming) {
+      db.signalAttemptsToday[todayStr] = (db.signalAttemptsToday[todayStr] || 0) + 1;
+    }
+    return {
+      isVip: true,
+      trialStarted: true,
+      trialStartDate: 0,
+      trialEndDate: now + 365 * 86400000,
+      currentDayIndex: 1,
+      daysRemaining: 365,
+      isExpired: false,
+      attemptsUsedToday: 0,
+      attemptsRemainingToday: 9999,
+      maxDailyAttempts: 9999,
+      totalAttemptsUsed: 0,
+      canAttempt: true,
+      message: "VIP Member: Unlimited Access Granted",
+      dateStr: todayStr,
+    };
+  }
+
+  let record = db.trialRecords[email];
+
+  // First eligible trial attempt starts the user's 5-day trial period
+  if (!record || !record.trialStartDate) {
+    const start = getDhakaDayStart(now);
+    const end = start + (TRIAL_DURATION_DAYS * 86400000) - 1; // End of 5th calendar day in Dhaka timezone
+
+    if (isConsuming) {
+      record = {
+        trialStartDate: start,
+        trialEndDate: end,
+        dailyAttempts: { [todayStr]: 1 },
+        totalAttempts: 1,
+        history: [{ timestamp: now, dateStr: todayStr, idempotencyKey }],
+      };
+      db.trialRecords[email] = record;
+      db.signalAttemptsToday[todayStr] = (db.signalAttemptsToday[todayStr] || 0) + 1;
+
+      return {
+        isVip: false,
+        trialStarted: true,
+        trialStartDate: start,
+        trialEndDate: end,
+        currentDayIndex: 1,
+        daysRemaining: 5,
+        isExpired: false,
+        attemptsUsedToday: 1,
+        attemptsRemainingToday: 4,
+        maxDailyAttempts: MAX_TRIAL_DAILY_ATTEMPTS,
+        totalAttemptsUsed: 1,
+        canAttempt: true,
+        message: "Trial Day 1 started: Attempt 1 of 5 used.",
+        dateStr: todayStr,
+      };
+    }
+
+    return {
+      isVip: false,
+      trialStarted: false,
+      trialStartDate: null,
+      trialEndDate: null,
+      currentDayIndex: 1,
+      daysRemaining: 5,
+      isExpired: false,
+      attemptsUsedToday: 0,
+      attemptsRemainingToday: MAX_TRIAL_DAILY_ATTEMPTS,
+      maxDailyAttempts: MAX_TRIAL_DAILY_ATTEMPTS,
+      totalAttemptsUsed: 0,
+      canAttempt: true,
+      message: "Trial available: 5 attempts per day for 5 consecutive calendar days.",
+      dateStr: todayStr,
+    };
+  }
+
+  // Check if overall 5-day trial period has expired
+  const isExpired = now > record.trialEndDate;
+  const dayDiff = Math.max(1, Math.min(5, Math.floor((now - record.trialStartDate) / 86400000) + 1));
+  const daysRemaining = isExpired ? 0 : Math.max(0, 5 - dayDiff + 1);
+
+  if (isExpired) {
+    return {
+      isVip: false,
+      trialStarted: true,
+      trialStartDate: record.trialStartDate,
+      trialEndDate: record.trialEndDate,
+      currentDayIndex: 5,
+      daysRemaining: 0,
+      isExpired: true,
+      attemptsUsedToday: record.dailyAttempts[todayStr] || 0,
+      attemptsRemainingToday: 0,
+      maxDailyAttempts: MAX_TRIAL_DAILY_ATTEMPTS,
+      totalAttemptsUsed: record.totalAttempts || 0,
+      canAttempt: false,
+      message: "Your 5-day trial period has expired. Please activate VIP membership to continue receiving signals.",
+      dateStr: todayStr,
+    };
+  }
+
+  // Idempotency check: prevent duplicate counting if client retries same request
+  if (isConsuming && idempotencyKey && record.history) {
+    const existingAttempt = record.history.find(h => h.idempotencyKey === idempotencyKey && (now - h.timestamp) < 45000);
+    if (existingAttempt) {
+      const used = record.dailyAttempts[todayStr] || 0;
+      return {
+        isVip: false,
+        trialStarted: true,
+        trialStartDate: record.trialStartDate,
+        trialEndDate: record.trialEndDate,
+        currentDayIndex: dayDiff,
+        daysRemaining,
+        isExpired: false,
+        attemptsUsedToday: used,
+        attemptsRemainingToday: Math.max(0, MAX_TRIAL_DAILY_ATTEMPTS - used),
+        maxDailyAttempts: MAX_TRIAL_DAILY_ATTEMPTS,
+        totalAttemptsUsed: record.totalAttempts || 0,
+        canAttempt: true,
+        message: "Idempotent attempt replayed without duplicate counting.",
+        dateStr: todayStr,
+      };
+    }
+  }
+
+  const usedToday = record.dailyAttempts[todayStr] || 0;
+
+  // Enforce maximum 5 attempts per calendar day
+  if (usedToday >= MAX_TRIAL_DAILY_ATTEMPTS) {
+    return {
+      isVip: false,
+      trialStarted: true,
+      trialStartDate: record.trialStartDate,
+      trialEndDate: record.trialEndDate,
+      currentDayIndex: dayDiff,
+      daysRemaining,
+      isExpired: false,
+      attemptsUsedToday: usedToday,
+      attemptsRemainingToday: 0,
+      maxDailyAttempts: MAX_TRIAL_DAILY_ATTEMPTS,
+      totalAttemptsUsed: record.totalAttempts || 0,
+      canAttempt: false,
+      message: "Daily trial limit of 5 attempts reached. Please come back tomorrow for your next trial day.",
+      dateStr: todayStr,
+    };
+  }
+
+  if (isConsuming) {
+    record.dailyAttempts[todayStr] = usedToday + 1;
+    record.totalAttempts = (record.totalAttempts || 0) + 1;
+    if (!record.history) record.history = [];
+    record.history.push({ timestamp: now, dateStr: todayStr, idempotencyKey });
+    db.signalAttemptsToday[todayStr] = (db.signalAttemptsToday[todayStr] || 0) + 1;
+
+    return {
+      isVip: false,
+      trialStarted: true,
+      trialStartDate: record.trialStartDate,
+      trialEndDate: record.trialEndDate,
+      currentDayIndex: dayDiff,
+      daysRemaining,
+      isExpired: false,
+      attemptsUsedToday: usedToday + 1,
+      attemptsRemainingToday: Math.max(0, MAX_TRIAL_DAILY_ATTEMPTS - (usedToday + 1)),
+      maxDailyAttempts: MAX_TRIAL_DAILY_ATTEMPTS,
+      totalAttemptsUsed: record.totalAttempts,
+      canAttempt: true,
+      message: `Trial attempt recorded (${usedToday + 1}/5 used today, Day ${dayDiff}/5).`,
+      dateStr: todayStr,
+    };
+  }
+
+  return {
+    isVip: false,
+    trialStarted: true,
+    trialStartDate: record.trialStartDate,
+    trialEndDate: record.trialEndDate,
+    currentDayIndex: dayDiff,
+    daysRemaining,
+    isExpired: false,
+    attemptsUsedToday: usedToday,
+    attemptsRemainingToday: Math.max(0, MAX_TRIAL_DAILY_ATTEMPTS - usedToday),
+    maxDailyAttempts: MAX_TRIAL_DAILY_ATTEMPTS,
+    totalAttemptsUsed: record.totalAttempts || 0,
+    canAttempt: true,
+    message: `${Math.max(0, MAX_TRIAL_DAILY_ATTEMPTS - usedToday)} trial attempts remaining today (Day ${dayDiff} of 5).`,
+    dateStr: todayStr,
+  };
 }
 
 // Set up JSON parsing with a higher limit for high-res images
@@ -476,8 +760,680 @@ app.post("/api/db/sync", (req, res) => {
   }
 });
 
-// Dedicated Super Admin Action Endpoint
-app.post("/api/admin/action", (req, res): any => {
+// Helper to check admin authorization
+function checkAdminAuth(db: DbState, adminEmail: string | undefined): { isAuthorized: boolean; isSuper: boolean; account?: any } {
+  if (!adminEmail) return { isAuthorized: false, isSuper: false };
+  const lower = adminEmail.toLowerCase().trim();
+  const callerAccount = db.userAccounts?.[lower] || db.adminRoles?.[lower];
+  const isSuper = lower === "limon2581444@gmail.com" || lower === "limon2581444@gmail" || callerAccount?.role === "SUPER_ADMIN" || db.adminRoles?.[lower]?.role === "SUPER_ADMIN";
+  const isAdmin = isSuper || callerAccount?.role === "ADMIN" || db.adminRoles?.[lower]?.role === "ADMIN";
+  return { isAuthorized: isAdmin, isSuper, account: callerAccount };
+}
+
+// 1. User Registration Endpoint
+app.post("/api/auth/register", async (req, res): Promise<any> => {
+  return runWithDbLock(async () => {
+    try {
+      const { email, password, name } = req.body || {};
+      const cleanEmail = (email || "").toLowerCase().trim();
+      const cleanPass = (password || "").trim();
+      const cleanName = (name || "").trim() || (cleanEmail.split("@")[0] || "User");
+
+      if (!cleanEmail || !cleanPass) {
+        return res.status(400).json({ error: "Email and password are required" });
+      }
+
+      if (!cleanEmail.includes("@gmail.com")) {
+        return res.status(400).json({ error: "Only @gmail.com email addresses are allowed" });
+      }
+
+      if (cleanPass.length < 4) {
+        return res.status(400).json({ error: "Password must be at least 4 characters" });
+      }
+
+      const db = readDb();
+
+      // Check duplicate registration
+      if (db.registeredUsers && db.registeredUsers[cleanEmail]) {
+        return res.status(400).json({ error: "This Gmail is already registered. Please log in." });
+      }
+
+      const uid = generateUid(cleanEmail);
+      const now = Date.now();
+
+      // Save credentials & user account
+      db.registeredUsers[cleanEmail] = cleanPass;
+      if (!db.registrationTimes) db.registrationTimes = {};
+      db.registrationTimes[cleanEmail] = now;
+
+      // Remove from deleted users if previously deleted
+      if (db.deletedUsers) {
+        db.deletedUsers = db.deletedUsers.filter(u => u.toLowerCase() !== cleanEmail);
+      }
+
+      // Initialize user account
+      if (!db.userAccounts) db.userAccounts = {};
+      db.userAccounts[cleanEmail] = {
+        uid,
+        email: cleanEmail,
+        name: cleanName,
+        role: (cleanEmail === "limon2581444@gmail.com" || cleanEmail === "limon2581444@gmail") ? "SUPER_ADMIN" : "USER",
+        status: "active",
+        proStatus: "inactive",
+        createdAt: now,
+        lastLogin: now,
+        lastHeartbeat: now,
+        notes: "",
+      };
+
+      // Set initial heartbeat
+      if (!db.activeHeartbeats) db.activeHeartbeats = {};
+      db.activeHeartbeats[cleanEmail] = { lastHeartbeat: now, sessionId: `reg_${now}` };
+
+      // Initialize active session
+      if (!db.activeSessions) db.activeSessions = {};
+      db.activeSessions[cleanEmail] = now;
+
+      // Append audit log
+      if (!db.activityLogs) db.activityLogs = [];
+      db.activityLogs.unshift({
+        id: `act_${now}_${Math.floor(Math.random() * 1000)}`,
+        adminEmail: "system",
+        adminUid: "SYSTEM",
+        action: `New user registration: ${cleanEmail} (${cleanName})`,
+        targetUser: cleanEmail,
+        timestamp: now,
+      });
+
+      writeDb(db);
+
+      const safeAccount = { ...db.userAccounts[cleanEmail], isOnline: true };
+      const trial = evaluateTrial(db, cleanEmail, false);
+
+      return res.json({
+        status: "ok",
+        user: safeAccount,
+        trialStatus: trial,
+      });
+    } catch (err: any) {
+      console.error("[Register Error]:", err);
+      return res.status(500).json({ error: err.message || "Failed to register account" });
+    }
+  });
+});
+
+// 2. User Login Endpoint
+app.post("/api/auth/login", async (req, res): Promise<any> => {
+  return runWithDbLock(async () => {
+    try {
+      const { email, password, sessionId } = req.body || {};
+      const cleanEmail = (email || "").toLowerCase().trim();
+      const cleanPass = (password || "").trim();
+
+      if (!cleanEmail || !cleanPass) {
+        return res.status(400).json({ error: "Email and password are required" });
+      }
+
+      const db = readDb();
+
+      // Check account existence
+      const storedPass = db.registeredUsers?.[cleanEmail];
+      if (!storedPass) {
+        return res.status(401).json({ error: "No account found with this email. Please register first." });
+      }
+
+      // Check password
+      if (storedPass !== cleanPass) {
+        return res.status(401).json({ error: "Incorrect password. Please verify and try again." });
+      }
+
+      // Check if disabled / suspended
+      if ((db.disabledUsers || []).includes(cleanEmail) || db.userAccounts?.[cleanEmail]?.status === "disabled") {
+        return res.status(403).json({ error: "Your account has been suspended or disabled. Please contact admin." });
+      }
+
+      const now = Date.now();
+      const user: any = db.userAccounts?.[cleanEmail] || {
+        uid: generateUid(cleanEmail),
+        email: cleanEmail,
+        name: cleanEmail.split("@")[0],
+        role: "USER" as const,
+        status: "active" as const,
+        proStatus: "inactive" as const,
+        createdAt: now,
+        lastLogin: now,
+        lastHeartbeat: now,
+      };
+
+      user.lastLogin = now;
+      user.lastHeartbeat = now;
+      db.userAccounts[cleanEmail] = user;
+
+      // Update active heartbeat
+      if (!db.activeHeartbeats) db.activeHeartbeats = {};
+      db.activeHeartbeats[cleanEmail] = { lastHeartbeat: now, sessionId: sessionId || `sess_${now}` };
+
+      // Update active sessions
+      if (!db.activeSessions) db.activeSessions = {};
+      db.activeSessions[cleanEmail] = now;
+
+      writeDb(db);
+
+      const trial = evaluateTrial(db, cleanEmail, false);
+
+      return res.json({
+        status: "ok",
+        user: { ...user, isOnline: true },
+        trialStatus: trial,
+      });
+    } catch (err: any) {
+      console.error("[Login Error]:", err);
+      return res.status(500).json({ error: err.message || "Failed to log in" });
+    }
+  });
+});
+
+// 3. User Heartbeat Endpoint (Online presence tracking)
+app.post("/api/user/heartbeat", async (req, res): Promise<any> => {
+  try {
+    const { email, sessionId } = req.body || {};
+    if (!email) {
+      return res.status(400).json({ error: "email is required" });
+    }
+
+    const cleanEmail = email.toLowerCase().trim();
+    const db = readDb();
+    const now = Date.now();
+
+    if (!db.activeHeartbeats) db.activeHeartbeats = {};
+    db.activeHeartbeats[cleanEmail] = {
+      lastHeartbeat: now,
+      sessionId: sessionId || db.activeHeartbeats[cleanEmail]?.sessionId || `sess_${now}`,
+      ip: req.ip,
+    };
+
+    if (db.userAccounts?.[cleanEmail]) {
+      db.userAccounts[cleanEmail].lastLogin = now;
+      db.userAccounts[cleanEmail].lastHeartbeat = now;
+    }
+
+    // Persist heartbeat timestamp safely
+    writeDb(db);
+
+    const online = isUserOnline(db, cleanEmail);
+    return res.json({ status: "ok", online, serverTime: now });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. User Leave / Unload Endpoint (Immediate offline marking)
+app.post("/api/user/leave", async (req, res): Promise<any> => {
+  try {
+    const { email } = req.body || {};
+    if (email) {
+      const cleanEmail = email.toLowerCase().trim();
+      const db = readDb();
+      if (db.activeHeartbeats?.[cleanEmail]) {
+        db.activeHeartbeats[cleanEmail].lastHeartbeat = 0;
+        writeDb(db);
+      }
+    }
+    return res.json({ status: "ok" });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// 5. User Trial Status Endpoint
+app.get("/api/trial/status", (req, res): any => {
+  try {
+    const email = (req.query.email as string || "").toLowerCase().trim();
+    if (!email) {
+      return res.status(400).json({ error: "email is required" });
+    }
+    const db = readDb();
+    const trialStatus = evaluateTrial(db, email, false);
+    return res.json({ status: "ok", trialStatus });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// 6. User Payment Request Submission Endpoint
+app.post("/api/payment/request", async (req, res): Promise<any> => {
+  return runWithDbLock(async () => {
+    try {
+      const { email, paymentMethod, network, amount, transactionId, senderNumber } = req.body || {};
+      const cleanEmail = (email || "").toLowerCase().trim();
+      const cleanTx = (transactionId || "").trim();
+      const cleanSender = (senderNumber || "").trim();
+      const numericAmount = parseFloat(amount) || 20.0;
+
+      if (!cleanEmail || !cleanTx || !cleanSender) {
+        return res.status(400).json({ error: "Email, Transaction ID (TrxID), and Sender Number are required." });
+      }
+
+      const db = readDb();
+
+      // Check if user account is disabled
+      if ((db.disabledUsers || []).includes(cleanEmail) || db.userAccounts?.[cleanEmail]?.status === "disabled") {
+        return res.status(403).json({ error: "Account is disabled. Cannot submit payment requests." });
+      }
+
+      // Check for duplicate transaction reference across existing pending/approved requests
+      const existingTx = (db.submittedPayments || []).find(
+        p => p && p.transactionId && p.transactionId.toLowerCase() === cleanTx.toLowerCase() && p.status !== "REJECTED" && p.status !== "rejected" && p.status !== "disabled"
+      );
+
+      if (existingTx) {
+        return res.status(400).json({
+          error: "This Transaction ID (TrxID) has already been submitted and is currently being processed or approved. Please verify your TrxID.",
+        });
+      }
+
+      const userAccount = db.userAccounts?.[cleanEmail];
+      const uid = userAccount?.uid || generateUid(cleanEmail);
+      const userName = userAccount?.name || (cleanEmail.split("@")[0].charAt(0).toUpperCase() + cleanEmail.split("@")[0].slice(1));
+      const now = Date.now();
+
+      const newPayment = {
+        id: `pay_${now}_${Math.floor(Math.random() * 10000)}`,
+        userId: uid,
+        username: cleanEmail,
+        userEmail: cleanEmail,
+        userName,
+        paymentMethod: paymentMethod || "bKash",
+        network: network || paymentMethod || "bKash (বিকাশ)",
+        amount: numericAmount,
+        transactionId: cleanTx,
+        senderNumber: cleanSender,
+        timestamp: now,
+        status: "PENDING" as const,
+      };
+
+      if (!db.submittedPayments) db.submittedPayments = [];
+      db.submittedPayments.unshift(newPayment);
+
+      // Append to audit log
+      if (!db.activityLogs) db.activityLogs = [];
+      db.activityLogs.unshift({
+        id: `act_${now}_${Math.floor(Math.random() * 1000)}`,
+        adminEmail: "user",
+        adminUid: uid,
+        action: `Payment request submitted: ${newPayment.id} (${cleanTx}) by ${cleanEmail} for $${numericAmount}`,
+        targetUser: cleanEmail,
+        timestamp: now,
+      });
+
+      writeDb(db);
+
+      return res.json({
+        status: "ok",
+        message: "Payment request submitted successfully. Awaiting administrator review.",
+        request: newPayment,
+      });
+    } catch (err: any) {
+      console.error("[Payment Submission Error]:", err);
+      return res.status(500).json({ error: err.message || "Failed to submit payment request" });
+    }
+  });
+});
+
+// 7. Admin Dashboard Statistics Endpoint (Server-authoritative, persistent)
+app.get("/api/admin/stats", (req, res): any => {
+  try {
+    const adminEmail = (req.query.adminEmail as string || req.headers["x-admin-email"] as string || "").toLowerCase();
+    const db = readDb();
+
+    const auth = checkAdminAuth(db, adminEmail);
+    if (!auth.isAuthorized) {
+      return res.status(403).json({ error: "Unauthorized. Admin privileges required." });
+    }
+
+    const now = Date.now();
+    const todayStr = getDhakaDateStr(now);
+    const todayStart = getDhakaDayStart(now);
+    const sevenDaysAgo = now - 7 * 86400000;
+
+    const allUsers = Object.values(db.userAccounts || {});
+    const totalUsers = allUsers.length;
+
+    const newRegistrationsToday = allUsers.filter(u => u.createdAt && u.createdAt >= todayStart).length;
+    const newRegistrations7Days = allUsers.filter(u => u.createdAt && u.createdAt >= sevenDaysAgo).length;
+
+    // Online & Offline counts evaluated with 60s presence window
+    let onlineUsers = 0;
+    for (const u of allUsers) {
+      if (isUserOnline(db, u.email)) {
+        onlineUsers++;
+      }
+    }
+    const offlineUsers = Math.max(0, totalUsers - onlineUsers);
+
+    // Payment request counts
+    const payments = db.submittedPayments || [];
+    const totalPendingPayments = payments.filter(p => p.status === "PENDING" || p.status === "pending" || !p.status).length;
+    const approvedPayments = payments.filter(p => p.status === "APPROVED" || p.status === "approved").length;
+    const rejectedPayments = payments.filter(p => p.status === "REJECTED" || p.status === "rejected" || p.status === "disabled").length;
+    const underReviewPayments = payments.filter(p => p.status === "UNDER_REVIEW").length;
+    const pendingVipRequests = totalPendingPayments; // VIP activation requests awaiting review
+
+    // VIP subscribers breakdown
+    const activeVipSubscribers = allUsers.filter(
+      u => u.proStatus === "active" && (!u.proExpiresAt || u.proExpiresAt > now) && u.status !== "disabled"
+    ).length;
+
+    const expiredVipSubscriptions = allUsers.filter(
+      u => u.proStatus === "expired" || (u.proExpiresAt && u.proExpiresAt <= now && u.role !== "SUPER_ADMIN")
+    ).length;
+
+    // Platform signal attempts executed today
+    const totalSignalsToday = db.signalAttemptsToday?.[todayStr] || 0;
+
+    return res.json({
+      status: "ok",
+      stats: {
+        totalUsers,
+        newRegistrationsToday,
+        newRegistrations7Days,
+        onlineUsers,
+        offlineUsers,
+        totalPendingPayments,
+        approvedPayments,
+        rejectedPayments,
+        underReviewPayments,
+        pendingVipRequests,
+        activeVipSubscribers,
+        expiredVipSubscriptions,
+        totalSignalsToday,
+        serverTime: now,
+        timezone: BUSINESS_TIMEZONE,
+      },
+    });
+  } catch (err: any) {
+    console.error("[Admin Stats Error]:", err);
+    return res.status(500).json({ error: err.message || "Failed to load dashboard statistics" });
+  }
+});
+
+// 8. Admin Users Management Endpoint (Server pagination, filtering, search)
+app.get("/api/admin/users", (req, res): any => {
+  try {
+    const adminEmail = (req.query.adminEmail as string || req.headers["x-admin-email"] as string || "").toLowerCase();
+    const db = readDb();
+
+    const auth = checkAdminAuth(db, adminEmail);
+    if (!auth.isAuthorized) {
+      return res.status(403).json({ error: "Unauthorized. Admin privileges required." });
+    }
+
+    const page = Math.max(1, parseInt(req.query.page as string || "1", 10));
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string || "20", 10)));
+    const search = (req.query.search as string || "").trim().toLowerCase();
+    const filter = (req.query.filter as string || "ALL").toUpperCase();
+
+    const now = Date.now();
+    const todayStr = getDhakaDateStr(now);
+
+    let users = Object.values(db.userAccounts || {}).map(u => {
+      const email = u.email.toLowerCase();
+      const online = isUserOnline(db, email);
+      const trialRec = db.trialRecords?.[email];
+      const usedToday = trialRec?.dailyAttempts?.[todayStr] || 0;
+      const remainingToday = Math.max(0, MAX_TRIAL_DAILY_ATTEMPTS - usedToday);
+
+      return {
+        ...u,
+        isOnline: online,
+        trialAttemptsToday: usedToday,
+        trialRemainingToday: remainingToday,
+      };
+    });
+
+    // Apply Filters
+    if (filter === "ONLINE") {
+      users = users.filter(u => u.isOnline);
+    } else if (filter === "OFFLINE") {
+      users = users.filter(u => !u.isOnline);
+    } else if (filter === "ACTIVE") {
+      users = users.filter(u => u.status === "active");
+    } else if (filter === "INACTIVE") {
+      users = users.filter(u => u.status === "inactive");
+    } else if (filter === "DISABLED") {
+      users = users.filter(u => u.status === "disabled");
+    } else if (filter === "PRO ACTIVE" || filter === "PRO_ACTIVE") {
+      users = users.filter(u => u.proStatus === "active");
+    } else if (filter === "EXPIRED VIP" || filter === "EXPIRED_VIP") {
+      users = users.filter(u => u.proStatus === "expired" || (u.proExpiresAt && u.proExpiresAt <= now));
+    } else if (filter === "PENDING PAYMENT" || filter === "PENDING_PAYMENT") {
+      users = users.filter(u => (db.submittedPayments || []).some(p => p.username.toLowerCase() === u.email.toLowerCase() && (p.status === "PENDING" || p.status === "pending")));
+    }
+
+    // Apply Search
+    if (search) {
+      users = users.filter(u => {
+        return (
+          u.name.toLowerCase().includes(search) ||
+          u.email.toLowerCase().includes(search) ||
+          (u.uid && u.uid.toLowerCase().includes(search)) ||
+          (db.submittedPayments || []).some(p => p.username.toLowerCase() === u.email.toLowerCase() && p.transactionId.toLowerCase().includes(search))
+        );
+      });
+    }
+
+    // Sort by createdAt descending
+    users.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    const total = users.length;
+    const totalPages = Math.ceil(total / limit) || 1;
+    const startIndex = (page - 1) * limit;
+    const paginatedUsers = users.slice(startIndex, startIndex + limit);
+
+    return res.json({
+      status: "ok",
+      users: paginatedUsers,
+      total,
+      page,
+      limit,
+      totalPages,
+    });
+  } catch (err: any) {
+    console.error("[Admin Users Error]:", err);
+    return res.status(500).json({ error: err.message || "Failed to load users list" });
+  }
+});
+
+// 9. Admin Requests Management Endpoint (Search, status filters, pagination)
+app.get("/api/admin/requests", (req, res): any => {
+  try {
+    const adminEmail = (req.query.adminEmail as string || req.headers["x-admin-email"] as string || "").toLowerCase();
+    const db = readDb();
+
+    const auth = checkAdminAuth(db, adminEmail);
+    if (!auth.isAuthorized) {
+      return res.status(403).json({ error: "Unauthorized. Admin privileges required." });
+    }
+
+    const page = Math.max(1, parseInt(req.query.page as string || "1", 10));
+    const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string || "20", 10)));
+    const search = (req.query.search as string || "").trim().toLowerCase();
+    const filter = (req.query.filter as string || "ALL").toUpperCase();
+
+    let requests = [...(db.submittedPayments || [])];
+
+    // Filter by explicit status
+    if (filter === "PENDING") {
+      requests = requests.filter(p => p.status === "PENDING" || p.status === "pending" || !p.status);
+    } else if (filter === "UNDER_REVIEW") {
+      requests = requests.filter(p => p.status === "UNDER_REVIEW");
+    } else if (filter === "APPROVED") {
+      requests = requests.filter(p => p.status === "APPROVED" || p.status === "approved");
+    } else if (filter === "REJECTED") {
+      requests = requests.filter(p => p.status === "REJECTED" || p.status === "rejected" || p.status === "disabled");
+    }
+
+    // Apply Search
+    if (search) {
+      requests = requests.filter(p => {
+        return (
+          p.id.toLowerCase().includes(search) ||
+          (p.username && p.username.toLowerCase().includes(search)) ||
+          (p.userEmail && p.userEmail.toLowerCase().includes(search)) ||
+          (p.userName && p.userName.toLowerCase().includes(search)) ||
+          (p.transactionId && p.transactionId.toLowerCase().includes(search)) ||
+          (p.senderNumber && p.senderNumber.toLowerCase().includes(search)) ||
+          (p.paymentMethod && p.paymentMethod.toLowerCase().includes(search)) ||
+          (p.userId && p.userId.toLowerCase().includes(search))
+        );
+      });
+    }
+
+    // Sort by timestamp descending
+    requests.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    const total = requests.length;
+    const totalPages = Math.ceil(total / limit) || 1;
+    const startIndex = (page - 1) * limit;
+    const paginatedRequests = requests.slice(startIndex, startIndex + limit);
+
+    return res.json({
+      status: "ok",
+      requests: paginatedRequests,
+      total,
+      page,
+      limit,
+      totalPages,
+    });
+  } catch (err: any) {
+    console.error("[Admin Requests Error]:", err);
+    return res.status(500).json({ error: err.message || "Failed to load requests" });
+  }
+});
+
+// 10. Admin Request Review Endpoint (APPROVE, REJECT, UNDER_REVIEW)
+app.post("/api/admin/requests/:id/review", async (req, res): Promise<any> => {
+  return runWithDbLock(async () => {
+    try {
+      const requestId = req.params.id;
+      const { adminEmail, action, notes } = req.body || {};
+
+      const cleanAdmin = (adminEmail || "").toLowerCase().trim();
+      const db = readDb();
+
+      const auth = checkAdminAuth(db, cleanAdmin);
+      if (!auth.isAuthorized) {
+        return res.status(403).json({ error: "Unauthorized. Admin privileges required." });
+      }
+
+      if (!["APPROVE", "REJECT", "UNDER_REVIEW"].includes(action)) {
+        return res.status(400).json({ error: "Action must be APPROVE, REJECT, or UNDER_REVIEW." });
+      }
+
+      const reqIndex = (db.submittedPayments || []).findIndex(p => p.id === requestId);
+      if (reqIndex === -1) {
+        return res.status(404).json({ error: `Payment request ${requestId} not found.` });
+      }
+
+      const payment = db.submittedPayments[reqIndex];
+      const now = Date.now();
+      const targetUser = payment.username.toLowerCase();
+
+      // Guard: prevent duplicate approval
+      if (action === "APPROVE") {
+        if (payment.status === "APPROVED" || payment.status === "approved") {
+          return res.status(400).json({ error: "This payment request has already been approved." });
+        }
+
+        // Set Approved
+        payment.status = "APPROVED";
+        payment.reviewedAt = now;
+        payment.reviewedBy = cleanAdmin;
+        payment.approvedAt = now;
+        payment.approvedBy = cleanAdmin;
+        if (notes) payment.notes = notes;
+
+        // Activate 30 days VIP on user account
+        const expiresAt = now + 30 * 24 * 3600 * 1000;
+        const proUsers = (db.proUsers || []).filter(p => p.username.toLowerCase() !== targetUser);
+        proUsers.push({
+          username: targetUser,
+          expiresAt,
+          verifiedAt: now,
+        });
+        db.proUsers = proUsers;
+
+        // Ensure user account is active & proStatus is active
+        if (db.userAccounts?.[targetUser]) {
+          db.userAccounts[targetUser].status = "active";
+          db.userAccounts[targetUser].proStatus = "active";
+          db.userAccounts[targetUser].proExpiresAt = expiresAt;
+        }
+
+        // Remove from disabledUsers if was disabled
+        db.disabledUsers = (db.disabledUsers || []).filter(u => u !== targetUser);
+
+        // Append audit log
+        if (!db.activityLogs) db.activityLogs = [];
+        db.activityLogs.unshift({
+          id: `act_${now}_${Math.floor(Math.random() * 1000)}`,
+          adminEmail: cleanAdmin,
+          adminUid: auth.account?.uid || generateUid(cleanAdmin),
+          action: `Approved payment ${payment.id} (TrxID: ${payment.transactionId}) - 30 days VIP activated for ${targetUser}`,
+          targetUser,
+          timestamp: now,
+          details: notes,
+        });
+      } else if (action === "REJECT") {
+        payment.status = "REJECTED";
+        payment.reviewedAt = now;
+        payment.reviewedBy = cleanAdmin;
+        if (notes) payment.notes = notes;
+
+        if (!db.activityLogs) db.activityLogs = [];
+        db.activityLogs.unshift({
+          id: `act_${now}_${Math.floor(Math.random() * 1000)}`,
+          adminEmail: cleanAdmin,
+          adminUid: auth.account?.uid || generateUid(cleanAdmin),
+          action: `Rejected payment ${payment.id} (TrxID: ${payment.transactionId}) for ${targetUser}`,
+          targetUser,
+          timestamp: now,
+          details: notes,
+        });
+      } else if (action === "UNDER_REVIEW") {
+        payment.status = "UNDER_REVIEW";
+        payment.reviewedAt = now;
+        payment.reviewedBy = cleanAdmin;
+        if (notes) payment.notes = notes;
+
+        if (!db.activityLogs) db.activityLogs = [];
+        db.activityLogs.unshift({
+          id: `act_${now}_${Math.floor(Math.random() * 1000)}`,
+          adminEmail: cleanAdmin,
+          adminUid: auth.account?.uid || generateUid(cleanAdmin),
+          action: `Marked payment ${payment.id} (TrxID: ${payment.transactionId}) as UNDER REVIEW for ${targetUser}`,
+          targetUser,
+          timestamp: now,
+          details: notes,
+        });
+      }
+
+      writeDb(db);
+
+      return res.json({
+        status: "ok",
+        message: `Payment request marked as ${payment.status}.`,
+        request: payment,
+      });
+    } catch (err: any) {
+      console.error("[Review Request Error]:", err);
+      return res.status(500).json({ error: err.message || "Failed to review request" });
+    }
+  });
+});
+
+// Admin Execute Action Endpoint
+app.post("/api/admin/action", async (req, res): Promise<any> => {
   try {
     const { adminEmail, action, targetUser, data } = req.body || {};
     if (!adminEmail || !action) {
@@ -785,10 +1741,22 @@ app.post("/api/admin/action", (req, res): any => {
 // Primary Endpoint: Trading Chart pattern analyzer
 app.post("/api/analyze", async (req, res): Promise<any> => {
   try {
-    const { image, precision } = req.body;
+    const { image, precision, userEmail, idempotencyKey } = req.body;
 
     if (!image) {
       return res.status(400).json({ error: "Image data is required" });
+    }
+
+    // Check user trial / VIP entitlement on server BEFORE executing analysis
+    if (userEmail) {
+      const db = readDb();
+      const preCheck = evaluateTrial(db, userEmail, false);
+      if (!preCheck.canAttempt) {
+        return res.status(403).json({
+          error: preCheck.message,
+          trialStatus: preCheck,
+        });
+      }
     }
 
     let mimeType = "";
@@ -1020,7 +1988,21 @@ app.post("/api/analyze", async (req, res): Promise<any> => {
     }
 
     const tradingAnalysis = JSON.parse(analysisText.trim());
-    return res.json(tradingAnalysis);
+
+    // Atomically record and increment trial attempt upon confirmed success
+    let finalTrialStatus = null;
+    if (userEmail) {
+      await runWithDbLock(async () => {
+        const freshDb = readDb();
+        finalTrialStatus = evaluateTrial(freshDb, userEmail, true, idempotencyKey);
+        writeDb(freshDb);
+      });
+    }
+
+    return res.json({
+      ...tradingAnalysis,
+      trialStatus: finalTrialStatus,
+    });
 
   } catch (error: any) {
     console.error("Analysis API Error:", error);

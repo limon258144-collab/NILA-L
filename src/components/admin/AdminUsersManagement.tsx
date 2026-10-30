@@ -53,6 +53,8 @@ export default function AdminUsersManagement({
   onDeactivatePro,
   onResetPassword,
   onAddUser,
+  onLogoutAllMembers,
+  onLogoutUser,
 }: AdminUsersManagementProps) {
   const [search, setSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserAccount | null>(null);
@@ -86,17 +88,26 @@ export default function AdminUsersManagement({
     return "none";
   };
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const usersPerPage = 12;
+
   // Filter users based on activeFilter and search
   const filteredUsers = users.filter((u) => {
     if (!u) return false;
     const email = u.email ? u.email.toLowerCase() : "";
     const pStatus = getUserPaymentStatus(email);
+    const now = Date.now();
+    const isExpiredVip = u.proStatus === "expired" || (u.proExpiresAt && u.proExpiresAt <= now && u.role !== "SUPER_ADMIN");
 
     // Apply Filter
+    if (activeFilter === "ONLINE" && !u.isOnline) return false;
+    if (activeFilter === "OFFLINE" && u.isOnline) return false;
     if (activeFilter === "ACTIVE" && u.status !== "active") return false;
     if (activeFilter === "INACTIVE" && u.status !== "inactive") return false;
     if (activeFilter === "DISABLED" && u.status !== "disabled") return false;
     if (activeFilter === "PRO ACTIVE" && u.proStatus !== "active") return false;
+    if (activeFilter === "EXPIRED VIP" && !isExpiredVip) return false;
     if (activeFilter === "PRO INACTIVE" && u.proStatus !== "inactive") return false;
     if (activeFilter === "PENDING PAYMENT" && pStatus !== "pending") return false;
     if (activeFilter === "APPROVED" && pStatus !== "approved") return false;
@@ -130,16 +141,22 @@ export default function AdminUsersManagement({
   }
   const deduplicatedUsers = Array.from(uniqueUsersMap.values());
 
+  // Pagination calculation
+  const totalPages = Math.ceil(deduplicatedUsers.length / usersPerPage) || 1;
+  const validPage = Math.min(currentPage, totalPages);
+  const startIndex = (validPage - 1) * usersPerPage;
+  const paginatedUsers = deduplicatedUsers.slice(startIndex, startIndex + usersPerPage);
+
   const filterButtons = [
     { id: "ALL", label: "ALL" },
+    { id: "ONLINE", label: "ONLINE" },
+    { id: "OFFLINE", label: "OFFLINE" },
     { id: "ACTIVE", label: "ACTIVE" },
     { id: "INACTIVE", label: "INACTIVE" },
     { id: "DISABLED", label: "DISABLED" },
     { id: "PRO ACTIVE", label: "PRO ACTIVE" },
-    { id: "PRO INACTIVE", label: "PRO INACTIVE" },
+    { id: "EXPIRED VIP", label: "EXPIRED VIP" },
     { id: "PENDING PAYMENT", label: "PENDING PAYMENT" },
-    { id: "APPROVED", label: "APPROVED" },
-    { id: "DISABLED REQUEST", label: "DISABLED REQUEST" },
   ];
 
   return (
@@ -239,11 +256,12 @@ export default function AdminUsersManagement({
             </p>
           </div>
         ) : (
-          deduplicatedUsers.map((u, idx) => {
+          paginatedUsers.map((u, idx) => {
             const userPayments = getPaymentsForUser(u.email);
             const pStatus = getUserPaymentStatus(u.email);
             const isPro = u.proStatus === "active";
             const isDisabled = u.status === "disabled";
+            const isExpiredVip = u.proStatus === "expired" || (u.proExpiresAt && u.proExpiresAt <= Date.now() && u.role !== "SUPER_ADMIN");
 
             return (
               <div
@@ -261,7 +279,7 @@ export default function AdminUsersManagement({
                   {/* Left: User Identity */}
                   <div className="flex items-center gap-3 min-w-0">
                     <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0 border ${
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0 border relative ${
                         isDisabled
                           ? "bg-rose-950 border-rose-500/40 text-rose-300"
                           : isPro
@@ -270,6 +288,13 @@ export default function AdminUsersManagement({
                       }`}
                     >
                       {u.name ? u.name.charAt(0).toUpperCase() : u.email.charAt(0).toUpperCase()}
+                      {/* Presence indicator dot on avatar */}
+                      <span
+                        className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#0c0e14] ${
+                          u.isOnline ? "bg-emerald-400 animate-pulse" : "bg-slate-600"
+                        }`}
+                        title={u.isOnline ? "Online (Active Heartbeat)" : "Offline"}
+                      />
                     </div>
 
                     <div className="min-w-0">
@@ -290,7 +315,17 @@ export default function AdminUsersManagement({
                       </div>
                       <div className="text-[11px] text-slate-400 font-mono truncate">{u.email}</div>
                       <div className="text-[9px] text-slate-500 font-mono flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
-                        <span>UID: {u.uid || "N/A"}</span>
+                        <span 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopy(u.uid, u.uid);
+                          }}
+                          className="hover:text-indigo-300 cursor-pointer flex items-center gap-1"
+                          title="Click to copy UID"
+                        >
+                          UID: {u.uid || "N/A"}
+                          {copiedId === u.uid ? <span className="text-emerald-400">✓</span> : null}
+                        </span>
                         <span>•</span>
                         <span>Reg: {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "N/A"}</span>
                         <span>•</span>
@@ -303,6 +338,19 @@ export default function AdminUsersManagement({
 
                   {/* Right: Status Badges and Direct Action Controls */}
                   <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                    {/* Real-time Presence Badge */}
+                    {u.isOnline ? (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow-[0_0_8px_rgba(16,185,129,0.3)]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        ONLINE
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-slate-800/80 border border-slate-700 text-slate-400 text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                        OFFLINE
+                      </span>
+                    )}
+
                     {/* Account Status Badge */}
                     {u.status === "active" ? (
                       <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[9px] font-black uppercase tracking-wider">
@@ -324,9 +372,20 @@ export default function AdminUsersManagement({
                         <Sparkles className="w-2.5 h-2.5" />
                         PRO ACTIVE
                       </span>
+                    ) : isExpiredVip ? (
+                      <span className="px-2 py-0.5 rounded-full bg-orange-500/15 border border-orange-500/30 text-orange-400 text-[9px] font-bold uppercase tracking-wider">
+                        VIP EXPIRED
+                      </span>
                     ) : (
                       <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 text-[9px] font-bold uppercase tracking-wider">
                         FREE TIER
+                      </span>
+                    )}
+
+                    {/* Daily Trial limitation summary */}
+                    {u.role !== "SUPER_ADMIN" && !isPro && (
+                      <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 text-[9px] font-mono font-bold">
+                        Trial: {u.trialAttemptsToday || 0}/5 used ({u.trialRemainingToday !== undefined ? u.trialRemainingToday : 5} left)
                       </span>
                     )}
 
@@ -416,6 +475,38 @@ export default function AdminUsersManagement({
               </div>
             );
           })
+        )}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 p-3 rounded-2xl bg-[#0a0c12] border border-slate-800 text-xs mt-3">
+            <span className="text-[11px] text-slate-400 font-mono">
+              {language === "bn"
+                ? `মোট ${deduplicatedUsers.length} জনের মধ্যে ${startIndex + 1} - ${Math.min(deduplicatedUsers.length, startIndex + usersPerPage)} দেখানো হচ্ছে`
+                : `Showing ${startIndex + 1} - ${Math.min(deduplicatedUsers.length, startIndex + usersPerPage)} of ${deduplicatedUsers.length} users`}
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="px-3 py-1 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed font-bold text-xs cursor-pointer transition active:scale-95"
+              >
+                {language === "bn" ? "পূর্ববর্তী" : "Previous"}
+              </button>
+              <span className="px-2 py-1 text-[11px] font-mono text-indigo-300 font-bold">
+                {validPage} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="px-3 py-1 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed font-bold text-xs cursor-pointer transition active:scale-95"
+              >
+                {language === "bn" ? "পরবর্তী" : "Next"}
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

@@ -26,14 +26,20 @@ import {
   MessageCircle,
   Send,
 } from "lucide-react";
-import { AnalysisHistoryItem, TradingAnalysis } from "./types";
+import { AnalysisHistoryItem, TradingAnalysis, TrialStatus } from "./types";
 import { translations, Language } from "./utils/translations";
 import UploadArea from "./components/UploadArea";
 import RainEffect from "./components/RainEffect";
 import AnalysisResult from "./components/AnalysisResult";
 import LoginScreen from "./components/LoginScreen";
 import AdminPanel from "./components/AdminPanel";
-import { syncWithServer } from "./sync";
+import { 
+  syncWithServer, 
+  fetchTrialStatus, 
+  sendUserHeartbeat, 
+  sendUserLeave, 
+  submitPaymentRequest 
+} from "./sync";
 
 export default function App() {
   // Translate & Language States
@@ -54,6 +60,7 @@ export default function App() {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [forceLogoutNotice, setForceLogoutNotice] = useState(false);
+  const [trialStatus, setTrialStatus] = useState<TrialStatus | null>(null);
 
   // States to keep track of active sessions and registered users
   const [registeredUsers, setRegisteredUsers] = useState<Record<string, string>>({});
@@ -200,7 +207,7 @@ export default function App() {
     setTimeout(() => setWalletCopied(false), 2000);
   };
 
-  const handleProceedPayment = (e: React.FormEvent) => {
+  const handleProceedPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setPayError(null);
     setPaySuccess(null);
@@ -227,76 +234,60 @@ export default function App() {
     }
 
     const numericAmount = parseFloat(payAmount) || 20.0;
+    const targetUsername = currentUser || "unknown";
 
     setIsVerifyingTx(true);
     setVerificationStep(1);
 
-    setTimeout(() => {
-      try {
-        const targetUsername = currentUser || "unknown";
-        
-        // Clear target user from deletedUsers locally if present
-        try {
-          const deletedUsers: string[] = JSON.parse(localStorage.getItem("nila_deleted_users_v1") || "[]");
-          const filteredDeleted = deletedUsers.filter((u: string) => u.toLowerCase() !== targetUsername.toLowerCase());
-          localStorage.setItem("nila_deleted_users_v1", JSON.stringify(filteredDeleted));
-        } catch (e) {}
+    try {
+      const serverRes = await submitPaymentRequest({
+        email: targetUsername,
+        paymentMethod: selectedNetwork.includes("bKash") ? "bKash" : (selectedNetwork.includes("USDT") ? "USDT" : (selectedNetwork.includes("TRX") ? "TRX" : "Crypto")),
+        network: selectedNetwork,
+        transactionId: cleanTx,
+        amount: numericAmount,
+        senderNumber: cleanSender,
+      });
 
+      if (!serverRes.success) {
+        setIsVerifyingTx(false);
+        setVerificationStep(0);
+        setPayError(serverRes.error || (language === "bn" ? "পেমেন্ট সংরক্ষণ করতে সমস্যা হয়েছে।" : "Failed to submit payment"));
+        return;
+      }
+
+      // Add payment item to local storage cache for instant reactive display
+      try {
         const currentPaymentsStr = localStorage.getItem("nila_submitted_payments_v1") || "[]";
         const payments = JSON.parse(currentPaymentsStr);
-        const isBkash = selectedNetwork === "bKash (বিকাশ)";
-        
-        let hash = 0;
-        for (let i = 0; i < targetUsername.length; i++) {
-          hash = (hash << 5) - hash + targetUsername.charCodeAt(i);
-          hash |= 0;
+        const existingIdx = payments.findIndex((p: any) => p.id === serverRes.request?.id);
+        if (existingIdx >= 0) {
+          payments[existingIdx] = serverRes.request;
+        } else {
+          payments.push(serverRes.request);
         }
-        const userUid = `UID-FB-${Math.abs(hash).toString(16).toUpperCase().padStart(8, "0")}`;
-        const baseName = targetUsername.includes("@") ? targetUsername.split("@")[0] : targetUsername;
-        const userName = baseName.charAt(0).toUpperCase() + baseName.slice(1);
-
-        const payItem = {
-          id: "pay_" + Date.now() + "_" + Math.floor(Math.random() * 10000),
-          userId: userUid,
-          username: targetUsername,
-          userEmail: targetUsername,
-          userName: userName,
-          paymentMethod: isBkash ? "bKash" : (selectedNetwork.includes("USDT") ? "USDT" : (selectedNetwork.includes("TRX") ? "TRX" : "Crypto")),
-          network: selectedNetwork,
-          amount: numericAmount,
-          transactionId: cleanTx,
-          senderNumber: cleanSender,
-          timestamp: Date.now(),
-          status: "pending"
-        };
-        
-        // Add payment item and immediately persist and sync
-        payments.push(payItem);
         localStorage.setItem("nila_submitted_payments_v1", JSON.stringify(payments));
-        
-        window.dispatchEvent(new Event("nila_settings_updated"));
-        syncWithServer().then(() => {
-          refreshCustomConfig();
-        });
-        
-        setIsVerifyingTx(false);
-        setVerificationStep(0);
-        setTxID("");
-        setSenderNumber("");
-        setPaySuccess(
-          language === "bn"
-            ? "পেমেন্ট রিকোয়েস্ট সফলভাবে অ্যাডমিন প্যানেলে পাঠানো হয়েছে! অ্যাডমিন এ্যাপ্রুভ করলেই আপনার অ্যাকাউন্ট ভেরিফাইড হবে এবং ৩০ দিনের জন্য আনলিমিটেড সার্ভিস ব্যবহার করতে পারবেন।"
-            : "Payment request sent to Admin Panel! Once approved by Admin, your account will be verified with 30 days of unlimited access."
-        );
-        
-        playSuccessChime();
-      } catch (err) {
-        console.error(err);
-        setIsVerifyingTx(false);
-        setVerificationStep(0);
-        setPayError(language === "bn" ? "পেমেন্ট সংরক্ষণ করতে সমস্যা হয়েছে।" : "Something went wrong saving your payment.");
-      }
-    }, 800);
+      } catch (e) {}
+
+      window.dispatchEvent(new Event("nila_settings_updated"));
+      refreshCustomConfig();
+
+      setIsVerifyingTx(false);
+      setVerificationStep(0);
+      setTxID("");
+      setSenderNumber("");
+      setHasPendingPayment(true);
+      setPaySuccess(
+        language === "bn"
+          ? "পেমেন্ট রিকোয়েস্ট সফলভাবে অ্যাডমিন প্যানেলে পাঠানো হয়েছে! অ্যাডমিন রিভিউ করে এ্যাপ্রুভ করলেই আপনার অ্যাকাউন্ট ভেরিফাইড হবে এবং ৩০ দিনের জন্য আনলিমিটেড VIP সার্ভিস ব্যবহার করতে পারবেন।"
+          : "Payment request sent to Admin Panel! Once approved by Admin, your account will be verified with 30 days of VIP access."
+      );
+      playSuccessChime();
+    } catch (err: any) {
+      setIsVerifyingTx(false);
+      setVerificationStep(0);
+      setPayError(err.message || (language === "bn" ? "পেমেন্ট সংরক্ষণ করতে সমস্যা হয়েছে।" : "Something went wrong saving your payment."));
+    }
   };
 
 
@@ -544,10 +535,12 @@ export default function App() {
     }
   }, [currentUser, showSupportDrawer]);
 
-  // Periodic session heartbeat for logged-in user to maintain live online status
+  // Periodic session heartbeat & trial status for logged-in user to maintain real online presence
   useEffect(() => {
     if (!currentUser) return;
-    const sendSessionHeartbeat = () => {
+
+    const beat = () => {
+      sendUserHeartbeat(currentUser);
       try {
         const storedSessions = localStorage.getItem("nila_active_sessions_v1");
         let sessions: Record<string, number> = storedSessions ? JSON.parse(storedSessions) : {};
@@ -555,9 +548,30 @@ export default function App() {
         localStorage.setItem("nila_active_sessions_v1", JSON.stringify(sessions));
       } catch (e) {}
     };
-    sendSessionHeartbeat();
-    const heartbeatInterval = setInterval(sendSessionHeartbeat, 10000);
-    return () => clearInterval(heartbeatInterval);
+
+    const updateTrial = async () => {
+      const res = await fetchTrialStatus(currentUser);
+      if (res.success && res.trialStatus) {
+        setTrialStatus(res.trialStatus);
+      }
+    };
+
+    beat();
+    updateTrial();
+
+    const heartbeatInterval = setInterval(beat, 20000); // 20s heartbeat against 60s presence window
+    const trialInterval = setInterval(updateTrial, 25000);
+
+    const onUnload = () => {
+      sendUserLeave(currentUser);
+    };
+    window.addEventListener("beforeunload", onUnload);
+
+    return () => {
+      clearInterval(heartbeatInterval);
+      clearInterval(trialInterval);
+      window.removeEventListener("beforeunload", onUnload);
+    };
   }, [currentUser]);
 
   useEffect(() => {
@@ -931,12 +945,13 @@ export default function App() {
     }
 
     if (currentUser) {
-      const limitCheck = checkAnalysisLimit(currentUser);
-      if (!limitCheck.allowed) {
+      if (trialStatus && !trialStatus.isVip && !trialStatus.canAttempt) {
         setErrorMsg(
-          language === "bn"
-            ? "দুঃখিত! আপনার ৩ টি ফ্রি ট্রায়াল লিমিট শেষ হয়ে গেছে। আরও সিগন্যাল পেতে প্রো মেম্বারশিপ একটিভ করুন।"
-            : "Sorry! Your limit of 3 free trial analyses has been exhausted. To continue, please activate PRO membership."
+          trialStatus.message || (
+            language === "bn"
+              ? "দুঃখিত! আজকের ৫ টি ফ্রি ট্রায়াল লিমিট অথবা ৫ দিনের মেয়াদ শেষ হয়ে গেছে। আরও সিগন্যাল পেতে প্রো মেম্বারশিপ একটিভ করুন।"
+              : "Daily trial limit reached (5 attempts/day) or 5-day trial expired. Please activate PRO membership."
+          )
         );
         return;
       }
@@ -948,6 +963,7 @@ export default function App() {
     try {
       // Race Gemini API fetch against an optimal timeout of 5.1s to guarantee analysis completes in 7 seconds
       const apiPromise = (async () => {
+        const attemptIdempotencyKey = `attempt_${currentUser || "guest"}_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
         const response = await fetch("/api/analyze", {
           method: "POST",
           headers: {
@@ -956,16 +972,21 @@ export default function App() {
           body: JSON.stringify({
             image: selectedImage,
             precision: signalPrecision,
+            userEmail: currentUser || undefined,
+            idempotencyKey: attemptIdempotencyKey,
           }),
         });
 
         let errorText = "";
-        let analyzedPayload: TradingAnalysis | null = null;
+        let analyzedPayload: any = null;
 
         const text = await response.text();
         if (!response.ok) {
           try {
             const parsed = JSON.parse(text);
+            if (response.status === 403 && parsed.trialStatus) {
+              setTrialStatus(parsed.trialStatus);
+            }
             errorText = parsed.error || parsed.message || `Error ${response.status}`;
           } catch {
             if (text.includes("GEMINI_API_KEY") || text.includes("missing") || text.includes("API key")) {
@@ -985,10 +1006,10 @@ export default function App() {
 
         try {
           const trimmedText = text.trim();
-          if (!trimmedText.startsWith("{") && !trimmedText.startsWith("[")) {
-            throw new Error("eror dblpr");
+          analyzedPayload = JSON.parse(trimmedText);
+          if (analyzedPayload.trialStatus) {
+            setTrialStatus(analyzedPayload.trialStatus);
           }
-          analyzedPayload = JSON.parse(trimmedText) as TradingAnalysis;
         } catch (jsonErr: any) {
           console.error("Failed to parse successful analysis JSON:", jsonErr);
           throw new Error("eror dblpr");
@@ -998,7 +1019,7 @@ export default function App() {
           throw new Error(t.serverOffline);
         }
 
-        return analyzedPayload;
+        return analyzedPayload as TradingAnalysis;
       })();
 
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -1415,12 +1436,14 @@ export default function App() {
                 </div>
               )}
 
-              {/* Daily Analysis limit banner */}
+              {/* Daily Analysis limit banner (5 attempts/day for 5 days) */}
               {currentUser && !isUserAdmin(currentUser) && (
                 (() => {
-                  const isPro = checkUserProStatus(currentUser);
-                  const hasPendingPayment = checkUserPendingPayment(currentUser);
-                  const limitInfo = checkAnalysisLimit(currentUser);
+                  const isPro = checkUserProStatus(currentUser) || trialStatus?.isVip;
+                  const hasPending = hasPendingPayment || checkUserPendingPayment(currentUser);
+                  const isExpired = trialStatus?.trialExpired;
+                  const isDailyLimitReached = trialStatus && trialStatus.dailyRemaining === 0 && !isExpired;
+
                   return (
                     <div>
                       {isPro ? (
@@ -1433,14 +1456,14 @@ export default function App() {
                                 <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
                                 <span className="font-extrabold select-none text-[11px] sm:text-xs">
                                   {language === "bn"
-                                    ? "প্রো মেম্বারশিপ একটিভ আছে"
-                                    : "PRO Membership Active"}
+                                    ? "প্রো ভিআইপি মেম্বারশিপ সক্রিয় আছে"
+                                    : "PRO VIP Membership Active"}
                                 </span>
                               </div>
                               <span className="text-[10px] text-slate-400 font-bold select-none block mt-0.5">
                                 {language === "bn"
-                                  ? "আপনি আনলিমিটেড অ্যানালাইসিস সুবিধা পাচ্ছেন"
-                                  : "You have unlimited analysis access"}
+                                  ? "আপনি আনলিমিটেড সিগন্যাল অ্যানালাইসিস সুবিধা পাচ্ছেন"
+                                  : "You have unlimited high-precision VIP signals"}
                               </span>
                             </div>
                             <div className="font-mono font-bold text-right text-xs bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-xl border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.1)]">
@@ -1449,12 +1472,12 @@ export default function App() {
                                 if (days !== null) {
                                   return language === "bn" ? `${days} দিন বাকি` : `${days} days left`;
                                 }
-                                return language === "bn" ? "আজীবন" : "Lifetime";
+                                return language === "bn" ? "৩০ দিন মেয়াদী" : "30 Days VIP";
                               })()}
                             </div>
                           </div>
                         </div>
-                      ) : hasPendingPayment ? (
+                      ) : hasPending ? (
                         <div 
                           onClick={() => setShowPaymentGateway(true)}
                           className="p-3.5 rounded-2xl border bg-amber-950/25 border-amber-500/30 text-amber-300 hover:border-amber-500/50 hover:bg-amber-950/40 transition duration-155 cursor-pointer active:scale-[0.98] select-none"
@@ -1480,41 +1503,77 @@ export default function App() {
                             </div>
                           </div>
                         </div>
-                      ) : (
+                      ) : isExpired ? (
                         <div 
                           onClick={() => setShowPaymentGateway(true)}
-                          className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs transition duration-150 cursor-pointer active:scale-[0.98] select-none hover:brightness-110 ${
-                            limitInfo.remaining === 0 
-                              ? "bg-rose-950/25 border-rose-500/40 text-rose-350 animate-bounce" 
-                              : "bg-indigo-950/20 border-indigo-500/15 text-indigo-300 hover:border-indigo-500/30"
-                          }`}
+                          className="p-3.5 rounded-2xl border bg-rose-950/25 border-rose-500/40 text-rose-300 flex items-center justify-between text-xs transition duration-150 cursor-pointer active:scale-[0.98] select-none hover:brightness-110 animate-pulse"
                           title="Activate VIP Premium"
                         >
                           <div className="flex flex-col text-left">
                             <div className="flex items-center gap-2">
-                              <Sparkles className={`w-3.5 h-3.5 ${limitInfo.remaining === 0 ? "text-rose-450" : "text-indigo-400 animate-pulse"}`} />
+                              <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                              <span className="font-bold text-[11px] sm:text-xs text-rose-300">
+                                {language === "bn" ? "৫ দিনের ফ্রি ট্রায়াল সম্পন্ন হয়েছে" : "5-Day Free Trial Expired"}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
+                              {language === "bn" ? "সর্বোচ্চ ২৫টি ট্রায়াল শেষ। প্রো ফিচার একটিভ করুন।" : "25 attempts used. Click to activate VIP."}
+                            </span>
+                          </div>
+                          <span className="text-emerald-400 text-xs sm:text-[13px] font-black uppercase tracking-wider block bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/30">
+                            PRO FEUCHER ACTIVE KARO
+                          </span>
+                        </div>
+                      ) : isDailyLimitReached ? (
+                        <div 
+                          onClick={() => setShowPaymentGateway(true)}
+                          className="p-3.5 rounded-2xl border bg-amber-950/25 border-amber-500/40 text-amber-300 flex items-center justify-between text-xs transition duration-150 cursor-pointer active:scale-[0.98] select-none hover:brightness-110"
+                          title="Activate VIP Premium"
+                        >
+                          <div className="flex flex-col text-left">
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 animate-pulse" />
+                              <span className="font-bold text-[11px] sm:text-xs text-amber-300">
+                                {language === "bn"
+                                  ? `আজকের ৫টি ট্রায়াল শেষ (ডে ${trialStatus?.dayNumber || 1}/৫)`
+                                  : `Today's 5 trials used (Day ${trialStatus?.dayNumber || 1}/5)`}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
+                              {language === "bn"
+                                ? `আগামীকাল রাত ১২টায় নতুন ৫টি সিগন্যাল পাবেন (${trialStatus?.daysRemaining || 0} দিন বাকি)`
+                                : `Resets at midnight (${trialStatus?.daysRemaining || 0} trial days left)`}
+                            </span>
+                          </div>
+                          <span className="text-emerald-400 text-xs sm:text-[12px] font-black uppercase tracking-wider block bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/30 animate-pulse">
+                            PRO FEUCHER ACTIVE KARO
+                          </span>
+                        </div>
+                      ) : (
+                        <div 
+                          onClick={() => setShowPaymentGateway(true)}
+                          className="p-3.5 rounded-2xl border bg-indigo-950/20 border-indigo-500/20 text-indigo-300 hover:border-indigo-500/40 flex items-center justify-between text-xs transition duration-150 cursor-pointer active:scale-[0.98] select-none hover:brightness-110"
+                          title="Activate VIP Premium"
+                        >
+                          <div className="flex flex-col text-left">
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
                               <span className="font-semibold select-none text-[11px] sm:text-xs">
                                 {language === "bn"
-                                  ? "ফ্রি ট্রায়াল লিমিট:"
-                                  : "Free Trial Limit:"}
+                                  ? `ফ্রি ট্রায়াল: ডে ${trialStatus?.dayNumber || 1} / ৫`
+                                  : `Free Trial: Day ${trialStatus?.dayNumber || 1} of 5`}
                               </span>
                             </div>
                             <span className="text-[10px] text-indigo-400 font-bold select-none block mt-0.5">
                               {language === "bn"
-                                ? "এখানে ট্যাপ করে প্রো ফিচার কিনুন"
-                                : "Click here to buy PRO features"}
+                                ? "প্রতিদিন ৫টি সিগন্যাল • আনলিমিটেড পেতে প্রো নিন"
+                                : "5 attempts/day • Click to get Unlimited PRO"}
                             </span>
                           </div>
-                          <div className="font-mono font-bold text-right text-[11px]">
-                            {limitInfo.remaining === 0 ? (
-                              <span className="text-emerald-400 text-xs sm:text-[13.5px] font-black animate-pulse uppercase tracking-wider block">
-                                pro feucher active karo
-                              </span>
-                            ) : (
-                              language === "bn"
-                                ? `${limitInfo.remaining} টি বাকি (৩ টির মধ্যে)`
-                                : `${limitInfo.remaining} remaining (out of 3)`
-                            )}
+                          <div className="font-mono font-bold text-right text-[11px] bg-indigo-500/10 text-indigo-300 px-2.5 py-1.5 rounded-xl border border-indigo-500/20">
+                            {language === "bn"
+                              ? `আজ বাকি: ${trialStatus?.dailyRemaining ?? 5} / ৫`
+                              : `Left today: ${trialStatus?.dailyRemaining ?? 5} / 5`}
                           </div>
                         </div>
                       )}
