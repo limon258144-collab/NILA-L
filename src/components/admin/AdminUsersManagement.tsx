@@ -382,10 +382,14 @@ export default function AdminUsersManagement({
                       </span>
                     )}
 
-                    {/* Daily Trial limitation summary */}
+                    {/* Trial limitation summary (Max 3 free trials) */}
                     {u.role !== "SUPER_ADMIN" && !isPro && (
-                      <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 text-[9px] font-mono font-bold">
-                        Trial: {u.trialAttemptsToday || 0}/5 used ({u.trialRemainingToday !== undefined ? u.trialRemainingToday : 5} left)
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold ${
+                        (u.trialAttemptsToday || 0) >= 3
+                          ? "bg-rose-500/15 border border-rose-500/40 text-rose-300"
+                          : "bg-indigo-500/10 border border-indigo-500/25 text-indigo-300"
+                      }`}>
+                        Trial: {Math.min(3, u.trialAttemptsToday || 0)}/3 used ({u.trialRemainingToday !== undefined ? u.trialRemainingToday : Math.max(0, 3 - (u.trialAttemptsToday || 0))} left)
                       </span>
                     )}
 

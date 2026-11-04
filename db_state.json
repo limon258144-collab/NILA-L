@@ -4,10 +4,10 @@
     "000@gmail.com": "PROTECTED",
     "00l@gmail.com": "PROTECTED",
     "ll@gmail.com": "PROTECTED",
-    "rahman.trader@gmail.com": "mypassword123"
+    "rahman.trader@gmail.com": "PROTECTED"
   },
   "activeSessions": {
-    "limon2581444@gmail.com": 1793325680523,
+    "limon2581444@gmail.com": 1793807461244,
     "rahman.trader@gmail.com": 1793325707131
   },
   "proUsers": [
@@ -133,9 +133,42 @@
     "rahman.trader@gmail.com": 1793325707131
   },
   "disabledUsers": [
-    "limon258144@gmail.com"
+    "limon258144@gmail.com",
+    "rahman.trader@gmail.com"
   ],
   "activityLogs": [
+    {
+      "id": "act_1793375809944_388",
+      "adminEmail": "limon2581444@gmail.com",
+      "adminUid": "UID-FB-7F2FB8E6",
+      "action": "Disabled user account",
+      "targetUser": "rahman.trader@gmail.com",
+      "timestamp": 1793375809944
+    },
+    {
+      "id": "act_1793375678487_491",
+      "adminEmail": "limon2581444@gmail.com",
+      "adminUid": "UID-FB-7F2FB8E6",
+      "action": "Rejected payment pay_1783636083868_413 (TrxID: 0000000000) for 00l@gmail.com",
+      "targetUser": "00l@gmail.com",
+      "timestamp": 1793375678487
+    },
+    {
+      "id": "act_1793375674390_294",
+      "adminEmail": "limon2581444@gmail.com",
+      "adminUid": "UID-FB-7F2FB8E6",
+      "action": "Rejected payment pay_1793325718230_9865 (TrxID: BKASH99281) for rahman.trader@gmail.com",
+      "targetUser": "rahman.trader@gmail.com",
+      "timestamp": 1793375674390
+    },
+    {
+      "id": "act_1793375670801_124",
+      "adminEmail": "limon2581444@gmail.com",
+      "adminUid": "UID-FB-7F2FB8E6",
+      "action": "Rejected payment pay_1783636440231_768 (TrxID: 9999999999) for ll@gmail.com",
+      "targetUser": "ll@gmail.com",
+      "timestamp": 1793375670801
+    },
     {
       "id": "act_1793325737302_711",
       "adminEmail": "limon2581444@gmail.com",
@@ -202,9 +235,10 @@
       "role": "SUPER_ADMIN",
       "status": "active",
       "proStatus": "active",
-      "proExpiresAt": 1824861753756,
+      "proExpiresAt": 1825343504168,
       "createdAt": 1790458416573,
-      "lastLogin": 1793325680523,
+      "lastLogin": 1793807461244,
+      "lastHeartbeat": 1793807461282,
       "notes": "Master Super Admin"
     },
     "000@gmail.com": {
@@ -247,8 +281,8 @@
       "email": "rahman.trader@gmail.com",
       "name": "Rahman Trader",
       "role": "USER",
-      "status": "active",
-      "proStatus": "active",
+      "status": "disabled",
+      "proStatus": "inactive",
       "proExpiresAt": 1795917737302,
       "createdAt": 1793325707131,
       "lastLogin": 1793325707131,
@@ -263,7 +297,7 @@
       "role": "SUPER_ADMIN",
       "status": "active",
       "createdAt": 1783360000000,
-      "lastLogin": 1793325753756
+      "lastLogin": 1793807504168
     }
   },
   "activeHeartbeats": {
@@ -275,6 +309,11 @@
     "rahman.trader@gmail.com": {
       "lastHeartbeat": 0,
       "sessionId": "reg_1793325707131"
+    },
+    "limon2581444@gmail.com": {
+      "lastHeartbeat": 1793807461282,
+      "sessionId": "sess_1793807120853",
+      "ip": "127.0.0.1"
     }
   },
   "trialRecords": {},

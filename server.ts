@@ -89,7 +89,8 @@ interface DbState {
 // Business timezone: Asia/Dhaka (+06:00)
 const BUSINESS_TIMEZONE = "Asia/Dhaka";
 const PRESENCE_WINDOW_MS = 60000; // 60 seconds
-const MAX_TRIAL_DAILY_ATTEMPTS = 5;
+const MAX_TRIAL_TOTAL_ATTEMPTS = 3;
+const MAX_TRIAL_DAILY_ATTEMPTS = 3;
 const TRIAL_DURATION_DAYS = 5;
 
 function getDhakaDateStr(dateOrTs: Date | number = new Date()): string {
@@ -344,10 +345,10 @@ function evaluateTrial(
 
   let record = db.trialRecords[email];
 
-  // First eligible trial attempt starts the user's 5-day trial period
+  // First eligible trial attempt starts the user's trial period
   if (!record || !record.trialStartDate) {
     const start = getDhakaDayStart(now);
-    const end = start + (TRIAL_DURATION_DAYS * 86400000) - 1; // End of 5th calendar day in Dhaka timezone
+    const end = start + (TRIAL_DURATION_DAYS * 86400000) - 1;
 
     if (isConsuming) {
       record = {
@@ -360,20 +361,21 @@ function evaluateTrial(
       db.trialRecords[email] = record;
       db.signalAttemptsToday[todayStr] = (db.signalAttemptsToday[todayStr] || 0) + 1;
 
+      const remaining = Math.max(0, MAX_TRIAL_TOTAL_ATTEMPTS - 1);
       return {
         isVip: false,
         trialStarted: true,
         trialStartDate: start,
         trialEndDate: end,
         currentDayIndex: 1,
-        daysRemaining: 5,
+        daysRemaining: remaining > 0 ? 1 : 0,
         isExpired: false,
         attemptsUsedToday: 1,
-        attemptsRemainingToday: 4,
-        maxDailyAttempts: MAX_TRIAL_DAILY_ATTEMPTS,
+        attemptsRemainingToday: remaining,
+        maxDailyAttempts: MAX_TRIAL_TOTAL_ATTEMPTS,
         totalAttemptsUsed: 1,
-        canAttempt: true,
-        message: "Trial Day 1 started: Attempt 1 of 5 used.",
+        canAttempt: remaining > 0,
+        message: `ফ্রি ট্রায়াল শুরু হয়েছে: ৩টির মধ্যে ১মটি ব্যবহৃত (${remaining}টি বাকি)।`,
         dateStr: todayStr,
       };
     }
@@ -384,38 +386,37 @@ function evaluateTrial(
       trialStartDate: null,
       trialEndDate: null,
       currentDayIndex: 1,
-      daysRemaining: 5,
+      daysRemaining: 1,
       isExpired: false,
       attemptsUsedToday: 0,
-      attemptsRemainingToday: MAX_TRIAL_DAILY_ATTEMPTS,
-      maxDailyAttempts: MAX_TRIAL_DAILY_ATTEMPTS,
+      attemptsRemainingToday: MAX_TRIAL_TOTAL_ATTEMPTS,
+      maxDailyAttempts: MAX_TRIAL_TOTAL_ATTEMPTS,
       totalAttemptsUsed: 0,
       canAttempt: true,
-      message: "Trial available: 5 attempts per day for 5 consecutive calendar days.",
+      message: "ফ্রি ট্রায়াল উপলব্ধ: সর্বোচ্চ ৩টি সিগন্যাল বিশ্লেষণ করা যাবে।",
       dateStr: todayStr,
     };
   }
 
-  // Check if overall 5-day trial period has expired
-  const isExpired = now > record.trialEndDate;
-  const dayDiff = Math.max(1, Math.min(5, Math.floor((now - record.trialStartDate) / 86400000) + 1));
-  const daysRemaining = isExpired ? 0 : Math.max(0, 5 - dayDiff + 1);
+  const totalUsed = record.totalAttempts || 0;
+  const usedToday = record.dailyAttempts[todayStr] || 0;
 
-  if (isExpired) {
+  // Enforce absolute maximum of 3 trial attempts ever (no one can exceed 3)
+  if (totalUsed >= MAX_TRIAL_TOTAL_ATTEMPTS) {
     return {
       isVip: false,
       trialStarted: true,
       trialStartDate: record.trialStartDate,
       trialEndDate: record.trialEndDate,
-      currentDayIndex: 5,
+      currentDayIndex: 1,
       daysRemaining: 0,
       isExpired: true,
-      attemptsUsedToday: record.dailyAttempts[todayStr] || 0,
+      attemptsUsedToday: totalUsed,
       attemptsRemainingToday: 0,
-      maxDailyAttempts: MAX_TRIAL_DAILY_ATTEMPTS,
-      totalAttemptsUsed: record.totalAttempts || 0,
+      maxDailyAttempts: MAX_TRIAL_TOTAL_ATTEMPTS,
+      totalAttemptsUsed: totalUsed,
       canAttempt: false,
-      message: "Your 5-day trial period has expired. Please activate VIP membership to continue receiving signals.",
+      message: "দুঃখিত! আপনার ৩টি ফ্রি ট্রায়াল লিমিট শেষ হয়ে গেছে। আনলিমিটেড সিগন্যাল পেতে প্রো মেম্বারশিপ একটিভ করুন (PRO FEUCHER ACTIVE KARO)।",
       dateStr: todayStr,
     };
   }
@@ -424,87 +425,72 @@ function evaluateTrial(
   if (isConsuming && idempotencyKey && record.history) {
     const existingAttempt = record.history.find(h => h.idempotencyKey === idempotencyKey && (now - h.timestamp) < 45000);
     if (existingAttempt) {
-      const used = record.dailyAttempts[todayStr] || 0;
+      const remaining = Math.max(0, MAX_TRIAL_TOTAL_ATTEMPTS - totalUsed);
       return {
         isVip: false,
         trialStarted: true,
         trialStartDate: record.trialStartDate,
         trialEndDate: record.trialEndDate,
-        currentDayIndex: dayDiff,
-        daysRemaining,
-        isExpired: false,
-        attemptsUsedToday: used,
-        attemptsRemainingToday: Math.max(0, MAX_TRIAL_DAILY_ATTEMPTS - used),
-        maxDailyAttempts: MAX_TRIAL_DAILY_ATTEMPTS,
-        totalAttemptsUsed: record.totalAttempts || 0,
-        canAttempt: true,
+        currentDayIndex: 1,
+        daysRemaining: remaining > 0 ? 1 : 0,
+        isExpired: totalUsed >= MAX_TRIAL_TOTAL_ATTEMPTS,
+        attemptsUsedToday: usedToday,
+        attemptsRemainingToday: remaining,
+        maxDailyAttempts: MAX_TRIAL_TOTAL_ATTEMPTS,
+        totalAttemptsUsed: totalUsed,
+        canAttempt: remaining > 0,
         message: "Idempotent attempt replayed without duplicate counting.",
         dateStr: todayStr,
       };
     }
   }
 
-  const usedToday = record.dailyAttempts[todayStr] || 0;
-
-  // Enforce maximum 5 attempts per calendar day
-  if (usedToday >= MAX_TRIAL_DAILY_ATTEMPTS) {
-    return {
-      isVip: false,
-      trialStarted: true,
-      trialStartDate: record.trialStartDate,
-      trialEndDate: record.trialEndDate,
-      currentDayIndex: dayDiff,
-      daysRemaining,
-      isExpired: false,
-      attemptsUsedToday: usedToday,
-      attemptsRemainingToday: 0,
-      maxDailyAttempts: MAX_TRIAL_DAILY_ATTEMPTS,
-      totalAttemptsUsed: record.totalAttempts || 0,
-      canAttempt: false,
-      message: "Daily trial limit of 5 attempts reached. Please come back tomorrow for your next trial day.",
-      dateStr: todayStr,
-    };
-  }
-
   if (isConsuming) {
+    const newTotal = totalUsed + 1;
     record.dailyAttempts[todayStr] = usedToday + 1;
-    record.totalAttempts = (record.totalAttempts || 0) + 1;
+    record.totalAttempts = newTotal;
     if (!record.history) record.history = [];
     record.history.push({ timestamp: now, dateStr: todayStr, idempotencyKey });
     db.signalAttemptsToday[todayStr] = (db.signalAttemptsToday[todayStr] || 0) + 1;
 
+    const remaining = Math.max(0, MAX_TRIAL_TOTAL_ATTEMPTS - newTotal);
     return {
       isVip: false,
       trialStarted: true,
       trialStartDate: record.trialStartDate,
       trialEndDate: record.trialEndDate,
-      currentDayIndex: dayDiff,
-      daysRemaining,
-      isExpired: false,
+      currentDayIndex: 1,
+      daysRemaining: remaining > 0 ? 1 : 0,
+      isExpired: newTotal >= MAX_TRIAL_TOTAL_ATTEMPTS,
       attemptsUsedToday: usedToday + 1,
-      attemptsRemainingToday: Math.max(0, MAX_TRIAL_DAILY_ATTEMPTS - (usedToday + 1)),
-      maxDailyAttempts: MAX_TRIAL_DAILY_ATTEMPTS,
-      totalAttemptsUsed: record.totalAttempts,
-      canAttempt: true,
-      message: `Trial attempt recorded (${usedToday + 1}/5 used today, Day ${dayDiff}/5).`,
+      attemptsRemainingToday: remaining,
+      maxDailyAttempts: MAX_TRIAL_TOTAL_ATTEMPTS,
+      totalAttemptsUsed: newTotal,
+      canAttempt: remaining > 0,
+      message: remaining > 0
+        ? `সিগন্যাল বিশ্লেষণ সফল: ৩টির মধ্যে ${newTotal}টি ব্যবহৃত (${remaining}টি বাকি)।`
+        : `আপনার ৩টি ফ্রি ট্রায়াল সমাপ্ত হয়েছে। আনলিমিটেড পেতে প্রো একটিভ করুন।`,
       dateStr: todayStr,
     };
   }
 
+  const remaining = Math.max(0, MAX_TRIAL_TOTAL_ATTEMPTS - totalUsed);
   return {
     isVip: false,
     trialStarted: true,
     trialStartDate: record.trialStartDate,
     trialEndDate: record.trialEndDate,
-    currentDayIndex: dayDiff,
-    daysRemaining,
-    isExpired: false,
+    currentDayIndex: 1,
+    daysRemaining: remaining > 0 ? 1 : 0,
+    isExpired: totalUsed >= MAX_TRIAL_TOTAL_ATTEMPTS,
     attemptsUsedToday: usedToday,
-    attemptsRemainingToday: Math.max(0, MAX_TRIAL_DAILY_ATTEMPTS - usedToday),
-    maxDailyAttempts: MAX_TRIAL_DAILY_ATTEMPTS,
-    totalAttemptsUsed: record.totalAttempts || 0,
-    canAttempt: true,
-    message: `${Math.max(0, MAX_TRIAL_DAILY_ATTEMPTS - usedToday)} trial attempts remaining today (Day ${dayDiff} of 5).`,
+    attemptsRemainingToday: remaining,
+    maxDailyAttempts: MAX_TRIAL_TOTAL_ATTEMPTS,
+    totalAttemptsUsed: totalUsed,
+    canAttempt: remaining > 0,
+    message: remaining > 0
+      ? `ফ্রি ট্রায়াল: ৩টির মধ্যে ${remaining}টি বাকি।`
+      : `আপনার ৩টি ফ্রি ট্রায়াল লিমিট শেষ হয়ে গেছে। প্রো ফিচার একটিভ করুন।`,
     dateStr: todayStr,
   };
 }
@@ -1180,13 +1166,13 @@ app.get("/api/admin/users", (req, res): any => {
       const email = u.email.toLowerCase();
       const online = isUserOnline(db, email);
       const trialRec = db.trialRecords?.[email];
-      const usedToday = trialRec?.dailyAttempts?.[todayStr] || 0;
-      const remainingToday = Math.max(0, MAX_TRIAL_DAILY_ATTEMPTS - usedToday);
+      const usedTotal = trialRec?.totalAttempts || trialRec?.dailyAttempts?.[todayStr] || 0;
+      const remainingToday = Math.max(0, MAX_TRIAL_TOTAL_ATTEMPTS - usedTotal);
 
       return {
         ...u,
         isOnline: online,
-        trialAttemptsToday: usedToday,
+        trialAttemptsToday: usedTotal,
         trialRemainingToday: remainingToday,
       };
     });
@@ -1747,16 +1733,21 @@ app.post("/api/analyze", async (req, res): Promise<any> => {
       return res.status(400).json({ error: "Image data is required" });
     }
 
+    // Strictly require authenticated account so no one can bypass the 3-attempt limit
+    if (!userEmail) {
+      return res.status(401).json({
+        error: "দয়া করে আপনার জিমেইল অ্যাকাউন্ট দিয়ে লগইন করুন (Authentication Required)."
+      });
+    }
+
     // Check user trial / VIP entitlement on server BEFORE executing analysis
-    if (userEmail) {
-      const db = readDb();
-      const preCheck = evaluateTrial(db, userEmail, false);
-      if (!preCheck.canAttempt) {
-        return res.status(403).json({
-          error: preCheck.message,
-          trialStatus: preCheck,
-        });
-      }
+    const db = readDb();
+    const preCheck = evaluateTrial(db, userEmail, false);
+    if (!preCheck.canAttempt) {
+      return res.status(403).json({
+        error: preCheck.message || "দুঃখিত! আপনার ৩টি ফ্রি ট্রায়াল লিমিট শেষ হয়ে গেছে। আনলিমিটেড সিগন্যাল পেতে প্রো মেম্বারশিপ একটিভ করুন (PRO FEUCHER ACTIVE KARO)।",
+        trialStatus: preCheck,
+      });
     }
 
     let mimeType = "";

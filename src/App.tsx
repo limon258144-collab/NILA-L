@@ -945,13 +945,13 @@ export default function App() {
     }
 
     if (currentUser) {
-      if (trialStatus && !trialStatus.isVip && !trialStatus.canAttempt) {
+      const limitCheck = checkAnalysisLimit(currentUser);
+      const isExhausted = !limitCheck.allowed || (trialStatus && !trialStatus.isVip && !trialStatus.canAttempt);
+      if (isExhausted) {
         setErrorMsg(
-          trialStatus.message || (
-            language === "bn"
-              ? "দুঃখিত! আজকের ৫ টি ফ্রি ট্রায়াল লিমিট অথবা ৫ দিনের মেয়াদ শেষ হয়ে গেছে। আরও সিগন্যাল পেতে প্রো মেম্বারশিপ একটিভ করুন।"
-              : "Daily trial limit reached (5 attempts/day) or 5-day trial expired. Please activate PRO membership."
-          )
+          language === "bn"
+            ? "দুঃখিত! আপনার ৩ টি ফ্রি ট্রায়াল লিমিট শেষ হয়ে গেছে। আরও সিগন্যাল পেতে প্রো মেম্বারশিপ একটিভ করুন।"
+            : "Sorry! Your limit of 3 free trial analyses has been exhausted. To continue, please activate PRO membership."
         );
         return;
       }
@@ -1436,13 +1436,16 @@ export default function App() {
                 </div>
               )}
 
-              {/* Daily Analysis limit banner (5 attempts/day for 5 days) */}
+              {/* Free Trial Limit banner (Strictly Max 3 Free Trials per User) */}
               {currentUser && !isUserAdmin(currentUser) && (
                 (() => {
                   const isPro = checkUserProStatus(currentUser) || trialStatus?.isVip;
                   const hasPending = hasPendingPayment || checkUserPendingPayment(currentUser);
-                  const isExpired = trialStatus?.trialExpired;
-                  const isDailyLimitReached = trialStatus && trialStatus.dailyRemaining === 0 && !isExpired;
+                  const limitInfo = checkAnalysisLimit(currentUser);
+                  const serverRemaining = trialStatus?.attemptsRemainingToday !== undefined 
+                    ? trialStatus.attemptsRemainingToday 
+                    : limitInfo.remaining;
+                  const isLimitReached = serverRemaining === 0 || trialStatus?.isExpired || (trialStatus && !trialStatus.canAttempt) || limitInfo.remaining === 0;
 
                   return (
                     <div>
@@ -1503,49 +1506,24 @@ export default function App() {
                             </div>
                           </div>
                         </div>
-                      ) : isExpired ? (
+                      ) : isLimitReached ? (
                         <div 
                           onClick={() => setShowPaymentGateway(true)}
-                          className="p-3.5 rounded-2xl border bg-rose-950/25 border-rose-500/40 text-rose-300 flex items-center justify-between text-xs transition duration-150 cursor-pointer active:scale-[0.98] select-none hover:brightness-110 animate-pulse"
+                          className="p-3.5 rounded-2xl border bg-rose-950/25 border-rose-500/40 text-rose-300 flex items-center justify-between text-xs transition duration-150 cursor-pointer active:scale-[0.98] select-none hover:brightness-110 animate-bounce"
                           title="Activate VIP Premium"
                         >
                           <div className="flex flex-col text-left">
                             <div className="flex items-center gap-2">
                               <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
                               <span className="font-bold text-[11px] sm:text-xs text-rose-300">
-                                {language === "bn" ? "৫ দিনের ফ্রি ট্রায়াল সম্পন্ন হয়েছে" : "5-Day Free Trial Expired"}
+                                {language === "bn" ? "৩ টি ফ্রি ট্রায়াল লিমিট সমাপ্ত হয়েছে" : "3 Free Trial Limit Reached"}
                               </span>
                             </div>
                             <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
-                              {language === "bn" ? "সর্বোচ্চ ২৫টি ট্রায়াল শেষ। প্রো ফিচার একটিভ করুন।" : "25 attempts used. Click to activate VIP."}
+                              {language === "bn" ? "সর্বোচ্চ ৩টি ফ্রি ট্রায়াল শেষ। প্রো ফিচার একটিভ করুন।" : "Maximum 3 free trials exhausted. Click to buy PRO."}
                             </span>
                           </div>
-                          <span className="text-emerald-400 text-xs sm:text-[13px] font-black uppercase tracking-wider block bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/30">
-                            PRO FEUCHER ACTIVE KARO
-                          </span>
-                        </div>
-                      ) : isDailyLimitReached ? (
-                        <div 
-                          onClick={() => setShowPaymentGateway(true)}
-                          className="p-3.5 rounded-2xl border bg-amber-950/25 border-amber-500/40 text-amber-300 flex items-center justify-between text-xs transition duration-150 cursor-pointer active:scale-[0.98] select-none hover:brightness-110"
-                          title="Activate VIP Premium"
-                        >
-                          <div className="flex flex-col text-left">
-                            <div className="flex items-center gap-2">
-                              <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0 animate-pulse" />
-                              <span className="font-bold text-[11px] sm:text-xs text-amber-300">
-                                {language === "bn"
-                                  ? `আজকের ৫টি ট্রায়াল শেষ (ডে ${trialStatus?.dayNumber || 1}/৫)`
-                                  : `Today's 5 trials used (Day ${trialStatus?.dayNumber || 1}/5)`}
-                              </span>
-                            </div>
-                            <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
-                              {language === "bn"
-                                ? `আগামীকাল রাত ১২টায় নতুন ৫টি সিগন্যাল পাবেন (${trialStatus?.daysRemaining || 0} দিন বাকি)`
-                                : `Resets at midnight (${trialStatus?.daysRemaining || 0} trial days left)`}
-                            </span>
-                          </div>
-                          <span className="text-emerald-400 text-xs sm:text-[12px] font-black uppercase tracking-wider block bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/30 animate-pulse">
+                          <span className="text-emerald-400 text-xs sm:text-[13px] font-black uppercase tracking-wider block bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/30 animate-pulse">
                             PRO FEUCHER ACTIVE KARO
                           </span>
                         </div>
@@ -1560,20 +1538,20 @@ export default function App() {
                               <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
                               <span className="font-semibold select-none text-[11px] sm:text-xs">
                                 {language === "bn"
-                                  ? `ফ্রি ট্রায়াল: ডে ${trialStatus?.dayNumber || 1} / ৫`
-                                  : `Free Trial: Day ${trialStatus?.dayNumber || 1} of 5`}
+                                  ? "ফ্রি ট্রায়াল লিমিট:"
+                                  : "Free Trial Limit:"}
                               </span>
                             </div>
                             <span className="text-[10px] text-indigo-400 font-bold select-none block mt-0.5">
                               {language === "bn"
-                                ? "প্রতিদিন ৫টি সিগন্যাল • আনলিমিটেড পেতে প্রো নিন"
-                                : "5 attempts/day • Click to get Unlimited PRO"}
+                                ? "৩টির বেশি ফ্রি ব্যবহার করা যাবে না • আনলিমিটেড পেতে প্রো নিন"
+                                : "Max 3 free attempts • Click to buy PRO for unlimited"}
                             </span>
                           </div>
                           <div className="font-mono font-bold text-right text-[11px] bg-indigo-500/10 text-indigo-300 px-2.5 py-1.5 rounded-xl border border-indigo-500/20">
                             {language === "bn"
-                              ? `আজ বাকি: ${trialStatus?.dailyRemaining ?? 5} / ৫`
-                              : `Left today: ${trialStatus?.dailyRemaining ?? 5} / 5`}
+                              ? `${serverRemaining} টি বাকি (৩ টির মধ্যে)`
+                              : `${serverRemaining} remaining (out of 3)`}
                           </div>
                         </div>
                       )}

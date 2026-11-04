@@ -107,7 +107,7 @@ export interface TrialStatus {
   isExpired: boolean;
   attemptsUsedToday: number;
   attemptsRemainingToday: number;
-  maxDailyAttempts: number; // 5
+  maxDailyAttempts: number; // 3
   totalAttemptsUsed: number;
   canAttempt: boolean;
   message: string;
