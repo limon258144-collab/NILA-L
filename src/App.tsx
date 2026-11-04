@@ -1281,18 +1281,7 @@ export default function App() {
               </button>
             )}
 
-            {/* Logout button */}
-            {currentUser && (
-              <button
-                id="logout-btn"
-                onClick={() => setShowLogoutConfirm(true)}
-                className="px-2.5 py-1.5 rounded-xl bg-rose-950/60 border border-rose-500/50 text-rose-300 hover:bg-rose-900/70 hover:text-white transition duration-150 active:scale-90 cursor-pointer flex items-center gap-1.5 shadow-md shadow-rose-950/40 text-xs font-bold"
-                title={language === "bn" ? "লগ আউট" : "Log Out"}
-              >
-                <LogOut className="w-3.5 h-3.5 text-rose-400" />
-                <span className="text-[11px] font-extrabold">{language === "bn" ? "লগআউট" : "Logout"}</span>
-              </button>
-            )}
+
 
 
 
