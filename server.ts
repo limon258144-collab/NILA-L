@@ -761,40 +761,124 @@ app.post("/api/auth/register", async (req, res): Promise<any> => {
   return runWithDbLock(async () => {
     try {
       const { email, password, name } = req.body || {};
-      const cleanEmail = (email || "").toLowerCase().trim();
+      
+      // Smart email normalization: trim, remove inner spaces, lower-case
+      let cleanEmail = (email || "").toLowerCase().replace(/\s+/g, "");
+      if (cleanEmail === "limon2581444@gmail") {
+        cleanEmail = "limon2581444@gmail.com";
+      }
+      if (cleanEmail && !cleanEmail.includes("@")) {
+        cleanEmail = `${cleanEmail}@gmail.com`;
+      } else if (cleanEmail.endsWith("@gmail")) {
+        cleanEmail = `${cleanEmail}.com`;
+      }
+
       const cleanPass = (password || "").trim();
       const cleanName = (name || "").trim() || (cleanEmail.split("@")[0] || "User");
 
-      if (!cleanEmail || !cleanPass) {
-        return res.status(400).json({ error: "Email and password are required" });
+      if (!cleanEmail) {
+        return res.status(400).json({ 
+          error: "Email is required", 
+          bilingualError: "ইমেইল এড্রেস প্রদান করা আবশ্যক!" 
+        });
       }
 
-      if (!cleanEmail.includes("@gmail.com")) {
-        return res.status(400).json({ error: "Only @gmail.com email addresses are allowed" });
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanEmail)) {
+        return res.status(400).json({ 
+          error: "A valid email address is required (e.g. name@gmail.com)", 
+          bilingualError: "অনুগ্রহ করে একটি সঠিক ইমেইল এড্রেস লিখুন (যেমন: name@gmail.com)" 
+        });
+      }
+
+      if (!cleanPass) {
+        return res.status(400).json({ 
+          error: "Password is required", 
+          bilingualError: "পাসওয়ার্ড প্রদান করা আবশ্যক!" 
+        });
       }
 
       if (cleanPass.length < 4) {
-        return res.status(400).json({ error: "Password must be at least 4 characters" });
+        return res.status(400).json({ 
+          error: "Password must be at least 4 characters", 
+          bilingualError: "পাসওয়ার্ড কমপক্ষে ৪ অক্ষরের হতে হবে!" 
+        });
       }
 
       const db = readDb();
 
-      // Check duplicate registration
+      // Check if user is already registered
       if (db.registeredUsers && db.registeredUsers[cleanEmail]) {
-        return res.status(400).json({ error: "This Gmail is already registered. Please log in." });
+        // If the password matches their registered password, log them in smoothly without throwing an error!
+        if (db.registeredUsers[cleanEmail] === cleanPass) {
+          const now = Date.now();
+          if (db.disabledUsers) {
+            db.disabledUsers = db.disabledUsers.filter(u => u.toLowerCase() !== cleanEmail);
+          }
+          if (db.deletedUsers) {
+            db.deletedUsers = db.deletedUsers.filter(u => u.toLowerCase() !== cleanEmail);
+          }
+          if (!db.userAccounts) db.userAccounts = {};
+          if (!db.userAccounts[cleanEmail]) {
+            db.userAccounts[cleanEmail] = {
+              uid: generateUid(cleanEmail),
+              email: cleanEmail,
+              name: cleanName,
+              role: (cleanEmail === "limon2581444@gmail.com" || cleanEmail === "limon2581444@gmail") ? "SUPER_ADMIN" : "USER",
+              status: "active",
+              proStatus: "inactive",
+              createdAt: now,
+              lastLogin: now,
+              lastHeartbeat: now,
+              notes: "",
+            };
+          } else {
+            db.userAccounts[cleanEmail].status = "active";
+            db.userAccounts[cleanEmail].lastLogin = now;
+            db.userAccounts[cleanEmail].lastHeartbeat = now;
+          }
+
+          if (!db.activeHeartbeats) db.activeHeartbeats = {};
+          db.activeHeartbeats[cleanEmail] = { lastHeartbeat: now, sessionId: `reg_login_${now}` };
+          if (!db.activeSessions) db.activeSessions = {};
+          db.activeSessions[cleanEmail] = now;
+
+          writeDb(db);
+          const safeAccount = { ...db.userAccounts[cleanEmail], isOnline: true };
+          const trial = evaluateTrial(db, cleanEmail, false);
+          return res.json({
+            status: "ok",
+            user: safeAccount,
+            trialStatus: trial,
+            autoLoggedIn: true,
+            message: "Account was already registered. Logged in successfully.",
+            bilingualMessage: "এই অ্যাকাউন্টটি ইতিপূর্বে নিবন্ধিত ছিল, সফলভাবে লগইন হয়েছে।"
+          });
+        }
+
+        // Email already registered with different password
+        return res.status(400).json({ 
+          error: "This email is already registered. Please log in or use your registered password.",
+          bilingualError: "এই ইমেইল দিয়ে ইতিমধ্যে অ্যাকাউন্ট তৈরি করা আছে। দয়া করে লগইন করুন অথবা সঠিক পাসওয়ার্ড দিন।",
+          alreadyRegistered: true 
+        });
       }
 
       const uid = generateUid(cleanEmail);
       const now = Date.now();
 
       // Save credentials & user account
+      if (!db.registeredUsers) db.registeredUsers = {};
       db.registeredUsers[cleanEmail] = cleanPass;
       if (!db.registrationTimes) db.registrationTimes = {};
       db.registrationTimes[cleanEmail] = now;
 
-      // Remove from deleted users if previously deleted
+      // Remove from deleted and disabled users
       if (db.deletedUsers) {
         db.deletedUsers = db.deletedUsers.filter(u => u.toLowerCase() !== cleanEmail);
+      }
+      if (db.disabledUsers) {
+        db.disabledUsers = db.disabledUsers.filter(u => u.toLowerCase() !== cleanEmail);
       }
 
       // Initialize user account
@@ -840,10 +924,15 @@ app.post("/api/auth/register", async (req, res): Promise<any> => {
         status: "ok",
         user: safeAccount,
         trialStatus: trial,
+        message: "Registration completed successfully.",
+        bilingualMessage: "রেজিস্ট্রেশন সফল হয়েছে!"
       });
     } catch (err: any) {
       console.error("[Register Error]:", err);
-      return res.status(500).json({ error: err.message || "Failed to register account" });
+      return res.status(500).json({ 
+        error: err.message || "Failed to register account",
+        bilingualError: "রেজিস্ট্রেশন প্রক্রিয়ায় ত্রুটি হয়েছে। দয়া করে আবার চেষ্টা করুন।"
+      });
     }
   });
 });
@@ -853,11 +942,24 @@ app.post("/api/auth/login", async (req, res): Promise<any> => {
   return runWithDbLock(async () => {
     try {
       const { email, password, sessionId } = req.body || {};
-      const cleanEmail = (email || "").toLowerCase().trim();
+      
+      let cleanEmail = (email || "").toLowerCase().replace(/\s+/g, "");
+      if (cleanEmail === "limon2581444@gmail") {
+        cleanEmail = "limon2581444@gmail.com";
+      }
+      if (cleanEmail && !cleanEmail.includes("@")) {
+        cleanEmail = `${cleanEmail}@gmail.com`;
+      } else if (cleanEmail.endsWith("@gmail")) {
+        cleanEmail = `${cleanEmail}.com`;
+      }
+
       const cleanPass = (password || "").trim();
 
       if (!cleanEmail || !cleanPass) {
-        return res.status(400).json({ error: "Email and password are required" });
+        return res.status(400).json({ 
+          error: "Email and password are required",
+          bilingualError: "ইমেইল এবং পাসওয়ার্ড আবশ্যক!"
+        });
       }
 
       const db = readDb();
@@ -865,17 +967,27 @@ app.post("/api/auth/login", async (req, res): Promise<any> => {
       // Check account existence
       const storedPass = db.registeredUsers?.[cleanEmail];
       if (!storedPass) {
-        return res.status(401).json({ error: "No account found with this email. Please register first." });
+        return res.status(404).json({ 
+          error: "No account found with this email. Please register first.",
+          bilingualError: "এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি। দয়া করে আগে 'রেজিস্ট্রেশন' করুন।",
+          notFound: true
+        });
       }
 
       // Check password
       if (storedPass !== cleanPass) {
-        return res.status(401).json({ error: "Incorrect password. Please verify and try again." });
+        return res.status(401).json({ 
+          error: "Incorrect password. Please verify and try again.",
+          bilingualError: "ভুল পাসওয়ার্ড! অনুগ্রহ করে সঠিক পাসওয়ার্ড দিন।"
+        });
       }
 
       // Check if disabled / suspended
       if ((db.disabledUsers || []).includes(cleanEmail) || db.userAccounts?.[cleanEmail]?.status === "disabled") {
-        return res.status(403).json({ error: "Your account has been suspended or disabled. Please contact admin." });
+        return res.status(403).json({ 
+          error: "Your account has been suspended or disabled. Please contact admin.",
+          bilingualError: "আপনার অ্যাকাউন্টটি স্থগিত (Disabled) করা হয়েছে। দয়া করে অ্যাডমিনের সাথে যোগাযোগ করুন।"
+        });
       }
 
       const now = Date.now();
@@ -883,7 +995,7 @@ app.post("/api/auth/login", async (req, res): Promise<any> => {
         uid: generateUid(cleanEmail),
         email: cleanEmail,
         name: cleanEmail.split("@")[0],
-        role: "USER" as const,
+        role: (cleanEmail === "limon2581444@gmail.com" || cleanEmail === "limon2581444@gmail") ? "SUPER_ADMIN" : ("USER" as const),
         status: "active" as const,
         proStatus: "inactive" as const,
         createdAt: now,
@@ -911,10 +1023,14 @@ app.post("/api/auth/login", async (req, res): Promise<any> => {
         status: "ok",
         user: { ...user, isOnline: true },
         trialStatus: trial,
+        bilingualMessage: "লগইন সফল হয়েছে!"
       });
     } catch (err: any) {
       console.error("[Login Error]:", err);
-      return res.status(500).json({ error: err.message || "Failed to log in" });
+      return res.status(500).json({ 
+        error: err.message || "Failed to log in",
+        bilingualError: "লগইন প্রক্রিয়ায় সমস্যা দেখা দিয়েছে।"
+      });
     }
   });
 });

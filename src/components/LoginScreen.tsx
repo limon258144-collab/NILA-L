@@ -38,6 +38,8 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
   const [showChooser, setShowChooser] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [registeredConflictEmail, setRegisteredConflictEmail] = useState<string | null>(null);
+  const [unregisteredEmail, setUnregisteredEmail] = useState<string | null>(null);
   
   // Custom screen views inside Google Account popup
   const [googleView, setGoogleView] = useState<"select" | "custom">("select");
@@ -145,12 +147,16 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
     
     // Register or login on backend
     const regRes = await registerUser({ email: lower, password: "google-oauth", name: lower.split("@")[0] });
-    if (!regRes.success && regRes.error !== "An account with this email already exists") {
+    if (!regRes.success) {
       // If already registered, attempt login
       const logRes = await loginUser({ email: lower, password: "google-oauth" });
-      if (!logRes.success && logRes.error?.includes("disabled")) {
+      if (!logRes.success && (logRes.error?.includes("disabled") || logRes.error?.includes("suspended"))) {
         setIsSigningIn(false);
-        setErrorMsg(logRes.error);
+        setErrorMsg(
+          language === "bn"
+            ? "আপনার অ্যাকাউন্টটি স্থগিত (Disabled) করা হয়েছে। দয়া করে অ্যাডমিনের সাথে যোগাযোগ করুন।"
+            : logRes.error
+        );
         return;
       }
     }
@@ -162,22 +168,32 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
       const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
       if (!times[lower]) times[lower] = Date.now();
       localStorage.setItem("nila_registration_times_v1", JSON.stringify(times));
+      const disabled = JSON.parse(localStorage.getItem("nila_disabled_users_v1") || "[]");
+      const filtered = disabled.filter((u: string) => u.toLowerCase() !== lower);
+      localStorage.setItem("nila_disabled_users_v1", JSON.stringify(filtered));
     } catch {}
 
     setTimeout(() => {
       setIsSigningIn(false);
       setShowChooser(false);
       onLoginSuccess(email);
-    }, 600);
+    }, 400);
   };
 
   const handleCustomSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+    setRegisteredConflictEmail(null);
+    setUnregisteredEmail(null);
     
-    let cleanMail = customEmail.trim().toLowerCase();
+    let cleanMail = (customEmail || "").replace(/\s+/g, "").toLowerCase();
     if (cleanMail === "limon2581444@gmail") {
       cleanMail = "limon2581444@gmail.com";
+    }
+    if (cleanMail && !cleanMail.includes("@")) {
+      cleanMail = `${cleanMail}@gmail.com`;
+    } else if (cleanMail.endsWith("@gmail")) {
+      cleanMail = `${cleanMail}.com`;
     }
 
     if (cleanMail === "limon2581444@gmail.com") {
@@ -201,11 +217,12 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
       return;
     }
     
-    if (!cleanMail.includes("@gmail.com")) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanMail)) {
       setErrorMsg(
         language === "bn"
           ? "সঠিক Gmail দিন, যেমন: username@gmail.com"
-          : "Must be a valid @gmail.com address."
+          : "Must be a valid email address."
       );
       return;
     }
@@ -224,11 +241,15 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
     
     // Register or login on backend
     const regRes = await registerUser({ email: cleanMail, password: "google-oauth", name: cleanMail.split("@")[0] });
-    if (!regRes.success && regRes.error !== "An account with this email already exists") {
+    if (!regRes.success) {
       const logRes = await loginUser({ email: cleanMail, password: "google-oauth" });
-      if (!logRes.success && logRes.error?.includes("disabled")) {
+      if (!logRes.success && (logRes.error?.includes("disabled") || logRes.error?.includes("suspended"))) {
         setIsSigningIn(false);
-        setErrorMsg(logRes.error);
+        setErrorMsg(
+          language === "bn"
+            ? "আপনার অ্যাকাউন্টটি স্থগিত (Disabled) করা হয়েছে। দয়া করে অ্যাডমিনের সাথে যোগাযোগ করুন।"
+            : logRes.error
+        );
         return;
       }
     }
@@ -240,25 +261,36 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
       const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
       if (!times[cleanMail]) times[cleanMail] = Date.now();
       localStorage.setItem("nila_registration_times_v1", JSON.stringify(times));
+      const disabled = JSON.parse(localStorage.getItem("nila_disabled_users_v1") || "[]");
+      const filtered = disabled.filter((u: string) => u.toLowerCase() !== cleanMail);
+      localStorage.setItem("nila_disabled_users_v1", JSON.stringify(filtered));
     } catch {}
 
     setTimeout(() => {
       setIsSigningIn(false);
       setShowChooser(false);
       onLoginSuccess(cleanMail);
-    }, 600);
+    }, 400);
   };
 
   // Direct login submit handler
   const handleDirectLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
-    let email = loginEmail.trim().toLowerCase();
-    const password = loginPassword.trim();
+    setRegisteredConflictEmail(null);
+    setUnregisteredEmail(null);
 
+    let email = (loginEmail || "").replace(/\s+/g, "").toLowerCase();
     if (email === "limon2581444@gmail") {
       email = "limon2581444@gmail.com";
     }
+    if (email && !email.includes("@")) {
+      email = `${email}@gmail.com`;
+    } else if (email.endsWith("@gmail")) {
+      email = `${email}.com`;
+    }
+
+    const password = loginPassword.trim();
 
     if (!email || !password) {
       setErrorMsg(
@@ -269,11 +301,12 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
       return;
     }
 
-    if (!email.includes("@gmail.com")) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
       setErrorMsg(
         language === "bn" 
           ? "সঠিক জিমেইল আইডি দিন, যেমন: username@gmail.com" 
-          : "Please enter a valid @gmail.com address."
+          : "Please enter a valid email address."
       );
       return;
     }
@@ -284,7 +317,20 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
     const loginRes = await loginUser({ email, password });
     if (!loginRes.success) {
       setIsSigningIn(false);
-      setErrorMsg(loginRes.error || (language === "bn" ? "ভুল ইমেইল বা পাসওয়ার্ড!" : "Incorrect email or password!"));
+      if (loginRes.notFound) {
+        setUnregisteredEmail(email);
+        setErrorMsg(
+          language === "bn"
+            ? "এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি। দয়া করে নতুন রেজিস্ট্রেশন করুন।"
+            : "No account found with this email. Please register."
+        );
+      } else {
+        setErrorMsg(
+          language === "bn"
+            ? (loginRes.bilingualError || loginRes.error || "ভুল ইমেইল বা পাসওয়ার্ড!")
+            : (loginRes.error || "Incorrect email or password!")
+        );
+      }
       return;
     }
 
@@ -292,36 +338,61 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
       const users = JSON.parse(localStorage.getItem("nila_registered_users_v2") || "{}");
       users[email] = password;
       localStorage.setItem("nila_registered_users_v2", JSON.stringify(users));
+      const disabled = JSON.parse(localStorage.getItem("nila_disabled_users_v1") || "[]");
+      const filtered = disabled.filter((u: string) => u.toLowerCase() !== email.toLowerCase());
+      localStorage.setItem("nila_disabled_users_v1", JSON.stringify(filtered));
     } catch {}
 
     setTimeout(() => {
       setIsSigningIn(false);
       onLoginSuccess(email);
-    }, 500);
+    }, 400);
   };
 
   // Direct register/signup submit handler
   const handleDirectRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
-    const email = regEmail.trim().toLowerCase();
+    setRegisteredConflictEmail(null);
+    setUnregisteredEmail(null);
+
+    let email = (regEmail || "").replace(/\s+/g, "").toLowerCase();
+    if (email === "limon2581444@gmail") {
+      email = "limon2581444@gmail.com";
+    }
+    if (email && !email.includes("@")) {
+      email = `${email}@gmail.com`;
+    } else if (email.endsWith("@gmail")) {
+      email = `${email}.com`;
+    }
+
     const password = regPassword.trim();
     const confirm = regConfirmPassword.trim();
 
-    if (!email || !password || !confirm) {
+    if (!email) {
       setErrorMsg(
         language === "bn" 
-          ? "দয়া করে সম্পূর্ণ ফর্মটি পূরণ করুন!" 
-          : "Please fill up the entire form!"
+          ? "দয়া করে আপনার জিমেইল এড্রেস লিখুন!" 
+          : "Please enter your Gmail address!"
       );
       return;
     }
 
-    if (!email.includes("@gmail.com")) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
       setErrorMsg(
         language === "bn" 
-          ? "শুধুমাত্র @gmail.com অ্যাকাউন্ট দিয়ে রেজিস্ট্রেশন করতে পারবেন!" 
-          : "You can only register with a valid @gmail.com address!"
+          ? "সঠিক জিমেইল দিন, যেমন: username@gmail.com" 
+          : "Please enter a valid email address (e.g. username@gmail.com)"
+      );
+      return;
+    }
+
+    if (!password) {
+      setErrorMsg(
+        language === "bn" 
+          ? "দয়া করে নতুন পাসওয়ার্ড লিখুন!" 
+          : "Please enter a password!"
       );
       return;
     }
@@ -338,7 +409,7 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
     if (password !== confirm) {
       setErrorMsg(
         language === "bn" 
-          ? "পাসওয়ার্ড ও কনফার্ম পাসওয়ার্ড সমান হতে হবে!" 
+          ? "পাসওয়ার্ড ও কনফার্ম পাসওয়ার্ড সমান হতে হবে! দুটি ঘরে একই পাসওয়ার্ড দিন।" 
           : "Passwords do not match! Please confirm correct password."
       );
       return;
@@ -350,7 +421,20 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
     const regRes = await registerUser({ email, password, name: regName.trim() || undefined });
     if (!regRes.success) {
       setIsSigningIn(false);
-      setErrorMsg(regRes.error || (language === "bn" ? "রেজিস্ট্রেশন ব্যর্থ হয়েছে!" : "Registration failed!"));
+      if (regRes.alreadyRegistered) {
+        setRegisteredConflictEmail(email);
+        setErrorMsg(
+          language === "bn"
+            ? "এই ইমেইলটি দিয়ে ইতিমধ্যে অ্যাকাউন্ট তৈরি করা আছে। দয়া করে লগইন করুন।"
+            : "This email is already registered. Please log in."
+        );
+      } else {
+        setErrorMsg(
+          language === "bn"
+            ? (regRes.bilingualError || (regRes.error?.includes("already registered") ? "এই ইমেইলটি দিয়ে ইতিমধ্যে অ্যাকাউন্ট তৈরি করা আছে। দয়া করে লগইন করুন।" : regRes.error || "রেজিস্ট্রেশন ব্যর্থ হয়েছে!"))
+            : (regRes.error || "Registration failed!")
+        );
+      }
       return;
     }
 
@@ -361,12 +445,15 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
       const times = JSON.parse(localStorage.getItem("nila_registration_times_v1") || "{}");
       times[email] = Date.now();
       localStorage.setItem("nila_registration_times_v1", JSON.stringify(times));
+      const disabled = JSON.parse(localStorage.getItem("nila_disabled_users_v1") || "[]");
+      const filtered = disabled.filter((u: string) => u.toLowerCase() !== email.toLowerCase());
+      localStorage.setItem("nila_disabled_users_v1", JSON.stringify(filtered));
     } catch {}
 
     setTimeout(() => {
       setIsSigningIn(false);
       onLoginSuccess(email);
-    }, 600);
+    }, 400);
   };
 
   const openTelegramGroup = () => {
@@ -467,9 +554,41 @@ export default function LoginScreen({ onLoginSuccess, language }: LoginScreenPro
 
         {/* MAIN ERROR NOTIFICATION */}
         {errorMsg && (
-          <div className="p-3 mb-5 rounded-2xl bg-rose-500/15 border border-rose-500/25 text-rose-200 text-xs flex items-start gap-2.5 animate-shake text-left">
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-            <p className="font-semibold leading-relaxed">{errorMsg}</p>
+          <div className="p-3 mb-5 rounded-2xl bg-rose-500/15 border border-rose-500/25 text-rose-200 text-xs animate-shake text-left space-y-2">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <p className="font-semibold leading-relaxed flex-1">{errorMsg}</p>
+            </div>
+            {registeredConflictEmail && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveSegment("login");
+                  setLoginEmail(registeredConflictEmail);
+                  setErrorMsg(null);
+                  setRegisteredConflictEmail(null);
+                }}
+                className="w-full py-2 px-3 bg-indigo-600/40 hover:bg-indigo-600/60 border border-indigo-500/40 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition shadow-md"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>{language === "bn" ? "লগইন ট্যাবে যেতে এখানে চাপ দিন ➔" : "Go to Login with this email ➔"}</span>
+              </button>
+            )}
+            {unregisteredEmail && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveSegment("register");
+                  setRegEmail(unregisteredEmail);
+                  setErrorMsg(null);
+                  setUnregisteredEmail(null);
+                }}
+                className="w-full py-2 px-3 bg-emerald-600/40 hover:bg-emerald-600/60 border border-emerald-500/40 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer transition shadow-md"
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>{language === "bn" ? "নতুন অ্যাকাউন্ট তৈরি করতে এখানে চাপ দিন ➔" : "Click here to Register ➔"}</span>
+              </button>
+            )}
           </div>
         )}
 

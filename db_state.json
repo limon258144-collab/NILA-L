@@ -4,11 +4,19 @@
     "000@gmail.com": "PROTECTED",
     "00l@gmail.com": "PROTECTED",
     "ll@gmail.com": "PROTECTED",
-    "rahman.trader@gmail.com": "PROTECTED"
+    "rahman.trader@gmail.com": "PROTECTED",
+    "testuser123@gmail.com": "PROTECTED",
+    "bangladesh.trader1@gmail.com": "pass1234",
+    "fasttrader2@gmail.com": "mypassword99",
+    "trader3@gmail.com": "mypassword99"
   },
   "activeSessions": {
-    "limon2581444@gmail.com": 1793807461244,
-    "rahman.trader@gmail.com": 1793325707131
+    "limon2581444@gmail.com": 1793808628273,
+    "rahman.trader@gmail.com": 1793325707131,
+    "testuser123@gmail.com": 1793808010034,
+    "bangladesh.trader1@gmail.com": 1793808589840,
+    "fasttrader2@gmail.com": 1793808594392,
+    "trader3@gmail.com": 1793808609847
   },
   "proUsers": [
     {
@@ -130,13 +138,49 @@
     "000@gmail.com": 1783423021169,
     "00l@gmail.com": 1783635623834,
     "ll@gmail.com": 1783636416528,
-    "rahman.trader@gmail.com": 1793325707131
+    "rahman.trader@gmail.com": 1793325707131,
+    "testuser123@gmail.com": 1793808010034,
+    "bangladesh.trader1@gmail.com": 1793808589840,
+    "fasttrader2@gmail.com": 1793808594392,
+    "trader3@gmail.com": 1793808598705
   },
   "disabledUsers": [
     "limon258144@gmail.com",
     "rahman.trader@gmail.com"
   ],
   "activityLogs": [
+    {
+      "id": "act_1793808598705_501",
+      "adminEmail": "system",
+      "adminUid": "SYSTEM",
+      "action": "New user registration: trader3@gmail.com (trader3)",
+      "targetUser": "trader3@gmail.com",
+      "timestamp": 1793808598705
+    },
+    {
+      "id": "act_1793808594392_440",
+      "adminEmail": "system",
+      "adminUid": "SYSTEM",
+      "action": "New user registration: fasttrader2@gmail.com (fasttrader2)",
+      "targetUser": "fasttrader2@gmail.com",
+      "timestamp": 1793808594392
+    },
+    {
+      "id": "act_1793808589840_999",
+      "adminEmail": "system",
+      "adminUid": "SYSTEM",
+      "action": "New user registration: bangladesh.trader1@gmail.com (BD Trader)",
+      "targetUser": "bangladesh.trader1@gmail.com",
+      "timestamp": 1793808589840
+    },
+    {
+      "id": "act_1793808010034_152",
+      "adminEmail": "system",
+      "adminUid": "SYSTEM",
+      "action": "New user registration: testuser123@gmail.com (Test User)",
+      "targetUser": "testuser123@gmail.com",
+      "timestamp": 1793808010034
+    },
     {
       "id": "act_1793375809944_388",
       "adminEmail": "limon2581444@gmail.com",
@@ -235,10 +279,10 @@
       "role": "SUPER_ADMIN",
       "status": "active",
       "proStatus": "active",
-      "proExpiresAt": 1825343504168,
+      "proExpiresAt": 1825344628273,
       "createdAt": 1790458416573,
-      "lastLogin": 1793807461244,
-      "lastHeartbeat": 1793807461282,
+      "lastLogin": 1793808628273,
+      "lastHeartbeat": 1793808628273,
       "notes": "Master Super Admin"
     },
     "000@gmail.com": {
@@ -288,6 +332,54 @@
       "lastLogin": 1793325707131,
       "lastHeartbeat": 1793325707131,
       "notes": ""
+    },
+    "testuser123@gmail.com": {
+      "uid": "UID-FB-52D7DD66",
+      "email": "testuser123@gmail.com",
+      "name": "Test User",
+      "role": "USER",
+      "status": "active",
+      "proStatus": "inactive",
+      "createdAt": 1793808010034,
+      "lastLogin": 1793808010034,
+      "lastHeartbeat": 1793808010034,
+      "notes": ""
+    },
+    "bangladesh.trader1@gmail.com": {
+      "uid": "UID-FB-37CADED7",
+      "email": "bangladesh.trader1@gmail.com",
+      "name": "BD Trader",
+      "role": "USER",
+      "status": "active",
+      "proStatus": "inactive",
+      "createdAt": 1793808589840,
+      "lastLogin": 1793808589840,
+      "lastHeartbeat": 1793808589840,
+      "notes": ""
+    },
+    "fasttrader2@gmail.com": {
+      "uid": "UID-FB-25B55D87",
+      "email": "fasttrader2@gmail.com",
+      "name": "fasttrader2",
+      "role": "USER",
+      "status": "active",
+      "proStatus": "inactive",
+      "createdAt": 1793808594392,
+      "lastLogin": 1793808594392,
+      "lastHeartbeat": 1793808594392,
+      "notes": ""
+    },
+    "trader3@gmail.com": {
+      "uid": "UID-FB-3046EA16",
+      "email": "trader3@gmail.com",
+      "name": "trader3",
+      "role": "USER",
+      "status": "active",
+      "proStatus": "inactive",
+      "createdAt": 1793808598705,
+      "lastLogin": 1793808609847,
+      "lastHeartbeat": 1793808609847,
+      "notes": ""
     }
   },
   "adminRoles": {
@@ -297,7 +389,7 @@
       "role": "SUPER_ADMIN",
       "status": "active",
       "createdAt": 1783360000000,
-      "lastLogin": 1793807504168
+      "lastLogin": 1793808628273
     }
   },
   "activeHeartbeats": {
@@ -311,9 +403,24 @@
       "sessionId": "reg_1793325707131"
     },
     "limon2581444@gmail.com": {
-      "lastHeartbeat": 1793807461282,
-      "sessionId": "sess_1793807120853",
-      "ip": "127.0.0.1"
+      "lastHeartbeat": 1793808628273,
+      "sessionId": "sess_1793808628273"
+    },
+    "testuser123@gmail.com": {
+      "lastHeartbeat": 1793808010034,
+      "sessionId": "reg_1793808010034"
+    },
+    "bangladesh.trader1@gmail.com": {
+      "lastHeartbeat": 1793808589840,
+      "sessionId": "reg_1793808589840"
+    },
+    "fasttrader2@gmail.com": {
+      "lastHeartbeat": 1793808594392,
+      "sessionId": "reg_1793808594392"
+    },
+    "trader3@gmail.com": {
+      "lastHeartbeat": 1793808609847,
+      "sessionId": "reg_login_1793808609847"
     }
   },
   "trialRecords": {},

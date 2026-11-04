@@ -482,22 +482,45 @@ export async function registerUser(payload: {
   email: string;
   password: string;
   name?: string;
-}): Promise<{ success: boolean; user?: any; trialStatus?: any; error?: string }> {
+}): Promise<{ 
+  success: boolean; 
+  user?: any; 
+  trialStatus?: any; 
+  error?: string; 
+  bilingualError?: string; 
+  alreadyRegistered?: boolean;
+  message?: string;
+  bilingualMessage?: string;
+}> {
   try {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      return { success: false, error: err.error || "Registration failed" };
+      return { 
+        success: false, 
+        error: data.error || "Registration failed", 
+        bilingualError: data.bilingualError,
+        alreadyRegistered: Boolean(data.alreadyRegistered),
+      };
     }
-    const data = await res.json();
     syncWithServer();
-    return { success: true, user: data.user, trialStatus: data.trialStatus };
+    return { 
+      success: true, 
+      user: data.user, 
+      trialStatus: data.trialStatus,
+      message: data.message,
+      bilingualMessage: data.bilingualMessage,
+    };
   } catch (err: any) {
-    return { success: false, error: err.message || "Network error registering" };
+    return { 
+      success: false, 
+      error: err.message || "Network error registering", 
+      bilingualError: "নেটওয়ার্ক ত্রুটি! সার্ভারের সাথে সংযোগ স্থাপন করা যাচ্ছে না।" 
+    };
   }
 }
 
@@ -505,22 +528,41 @@ export async function loginUser(payload: {
   email: string;
   password: string;
   sessionId?: string;
-}): Promise<{ success: boolean; user?: any; trialStatus?: any; error?: string }> {
+}): Promise<{ 
+  success: boolean; 
+  user?: any; 
+  trialStatus?: any; 
+  error?: string;
+  bilingualError?: string;
+  notFound?: boolean;
+}> {
   try {
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      return { success: false, error: err.error || "Login failed" };
+      return { 
+        success: false, 
+        error: data.error || "Login failed",
+        bilingualError: data.bilingualError,
+        notFound: Boolean(data.notFound),
+      };
     }
-    const data = await res.json();
     syncWithServer();
-    return { success: true, user: data.user, trialStatus: data.trialStatus };
+    return { 
+      success: true, 
+      user: data.user, 
+      trialStatus: data.trialStatus 
+    };
   } catch (err: any) {
-    return { success: false, error: err.message || "Network error logging in" };
+    return { 
+      success: false, 
+      error: err.message || "Network error logging in",
+      bilingualError: "নেটওয়ার্ক ত্রুটি! সার্ভারের সাথে সংযোগ স্থাপন করা যাচ্ছে না।" 
+    };
   }
 }
 
